@@ -1,0 +1,356 @@
+const { MongoClient, ObjectId } = require('mongodb');
+const iconv = require('iconv-lite');
+iconv.skipDecodeWarning = true;
+const oracledb = require('oracledb');
+oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
+
+class Database {
+  constructor() {
+    this.handlers = {
+      sder: {
+        isMongo: true,
+        connected: false,
+        connection: null,
+        client: null,
+        collections: {
+          decisions: null,
+          rawJurinet: null,
+        },
+      },
+      index: {
+        isMongo: true,
+        connected: false,
+        connection: null,
+        client: null,
+        collections: {
+          affaires: null,
+          mainIndex: null,
+        },
+      },
+      si: {
+        isMongo: false,
+        connected: false,
+        connection: null,
+        client: null,
+        collections: {
+          jurinet: null,
+        },
+      },
+    };
+  }
+
+  getHandler(collection) {
+    if (/^sder\./i.test(collection) === true) {
+      return this.handlers.sder;
+    }
+    if (/^index\./i.test(collection) === true) {
+      return this.handlers.index;
+    }
+    if (/^si\./i.test(collection) === true) {
+      return this.handlers.si;
+    }
+    throw new Error(`getHandler: no handler for collection '${collection}'.`);
+  }
+
+  getDbURI(collection) {
+    if (/^sder\./i.test(collection) === true) {
+      return process.env.SDER_DB_URI;
+    }
+    if (/^index\./i.test(collection) === true) {
+      return process.env.INDEX_DB_URI;
+    }
+    if (/^si\./i.test(collection) === true) {
+      return process.env.SI_DB_URI;
+    }
+    throw new Error(`getDbURI: no database URI for collection '${collection}'.`);
+  }
+
+  getDbName(collection) {
+    if (/^sder\./i.test(collection) === true) {
+      return process.env.SDER_DB_NAME;
+    }
+    if (/^index\./i.test(collection) === true) {
+      return process.env.INDEX_DB_NAME;
+    }
+    if (/^si\./i.test(collection) === true) {
+      return process.env.SI_DB_NAME;
+    }
+    throw new Error(`getDbName: no database name for collection '${collection}'.`);
+  }
+
+  async connect(collection) {
+    const handler = this.getHandler(collection);
+    if (handler.connected === false) {
+      if (handler.isMongo === true) {
+        handler.connection = new MongoClient(this.getDbURI(collection), {
+          useUnifiedTopology: true,
+        });
+        await handler.connection.connect();
+        handler.client = handler.connection.db(this.getDbName(collection));
+        for (let coll in handler.collections) {
+          handler.collections[coll] = handler.client.collection(coll);
+        }
+        handler.connected = true;
+      } else {
+        // URI format : user:password@connectString
+        const [login, host] = this.getDbURI(collection).split('@');
+        const [user, password] = login.split(':');
+        handler.connection = await oracledb.getConnection({
+          user: user,
+          password: password,
+          connectString: host,
+        });
+        handler.connected = true;
+      }
+    }
+  }
+
+  async close(collection) {
+    const handler = this.getHandler(collection);
+    if (handler.connected === true) {
+      await handler.connection.close();
+      handler.connected = false;
+    }
+  }
+
+  async convertFromOracle(row) {
+    let data = {};
+    for (let key in row) {
+      switch (key) {
+        case 'ID_DOCUMENT':
+          data._id = row[key];
+          data.ID_DOCUMENT = row[key];
+          break;
+        case 'rnum':
+          // Ignore rnum key (added by offset/limit queries)
+          break;
+        case 'RNUM':
+          // Ignore RNUM key (added by offset/limit queries)
+          break;
+        default:
+          if (row[key] && typeof row[key].getData === 'function') {
+            data[key] = await row[key].getData();
+          } else {
+            data[key] = row[key];
+          }
+          if (Buffer.isBuffer(data[key])) {
+            data[key] = iconv.decode(data[key], 'CP1252');
+          }
+          break;
+      }
+    }
+    return data;
+  }
+
+  buildOracleReadQuery(collection, args) {
+    let query = `SELECT * FROM ${this.getDbName(collection)}`;
+    let params = [];
+    if (Array.isArray(args)) {
+      if (args.length === 1) {
+        if (typeof args[0] === 'string') {
+          query = args[0];
+        }
+      } else if (args.length === 2) {
+        if (typeof args[0] === 'string') {
+          query = args[0];
+        }
+        if (Array.isArray(args[1])) {
+          params = args[1];
+        }
+      }
+    }
+    if (
+      /^select\s/i.test(query) === false ||
+      /insert\s/i.test(query) === true ||
+      /update\s/i.test(query) === true ||
+      /delete\s/i.test(query) === true ||
+      /drop\s/i.test(query) === true ||
+      /set\s/i.test(query) === true ||
+      /create\s/i.test(query) === true ||
+      /rename\s/i.test(query) === true ||
+      /grant\s/i.test(query) === true ||
+      /revoke\s/i.test(query) === true ||
+      /lock\s/i.test(query) === true ||
+      /upsert\s/i.test(query) === true ||
+      /truncate\s/i.test(query) === true ||
+      /purge\s/i.test(query) === true ||
+      /merge\s/i.test(query) === true ||
+      /savepoint\s/i.test(query) === true ||
+      /rollback\s/i.test(query) === true ||
+      /flashback\s/i.test(query) === true ||
+      /associate\s/i.test(query) === true ||
+      /call\s/i.test(query) === true ||
+      /comment\s/i.test(query) === true ||
+      /administer\s/i.test(query) === true ||
+      /alter\s/i.test(query) === true
+    ) {
+      throw new Error(`buildOracleReadQuery: cannot perform query '${query}' on collection '${collection}'.`);
+    }
+    return [query, params];
+  }
+
+  async oracleReadQuery(collection, args) {
+    const handler = this.getHandler(collection);
+    let row;
+    const result = [];
+    const [query, params] = this.buildOracleReadQuery(collection, args);
+    const rs = await handler.connection.execute(query, params, {
+      resultSet: true,
+    });
+    const rows = rs.resultSet;
+    while ((row = await rows.getRow())) {
+      result.push(await this.convertFromOracle(row));
+    }
+    await rows.close();
+    return result;
+  }
+
+  async find(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`find: no handler for collection '${collection}'.`);
+    }
+    let row;
+    let result = [];
+    if (handler.isMongo === true) {
+      const cursor = await handler.collections[collection].find.apply(handler.collections[collection], args);
+      while ((row = await cursor.next())) {
+        result.push(row);
+      }
+      await cursor.close();
+    } else {
+      result = await this.oracleReadQuery(collection, args);
+    }
+    return result;
+  }
+
+  async findOne(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`findOne: no handler for collection '${collection}'.`);
+    }
+    let result = null;
+    if (handler.isMongo === true) {
+      result = await handler.collections[collection].findOne.apply(handler.collections[collection], args);
+    } else {
+      const res = await this.oracleReadQuery(collection, args);
+      if (Array.isArray(res) && res.length > 0) {
+        result = res[0];
+      }
+    }
+    return result;
+  }
+
+  async count(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`count: no handler for collection '${collection}'.`);
+    }
+    let result = 0;
+    if (handler.isMongo === true) {
+      result = await handler.collections[collection].countDocuments.apply(handler.collections[collection], args);
+    } else {
+      const res = await this.oracleReadQuery(collection, args);
+      if (Array.isArray(res) && res.length > 0) {
+        result = res.length;
+      }
+    }
+    return result;
+  }
+
+  async insertOne(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`insertOne: no handler for collection '${collection}'.`);
+    }
+    let result = null;
+    if (handler.isMongo === true) {
+      result = await handler.collections[collection].insertOne.apply(handler.collections[collection], args);
+    } else {
+      throw new Error(`insertOne: operation not available for collection '${collection}'.`);
+    }
+    return result;
+  }
+
+  async replaceOne(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`replaceOne: no handler for collection '${collection}'.`);
+    }
+    let result = null;
+    if (handler.isMongo === true) {
+      result = await handler.collections[collection].replaceOne.apply(handler.collections[collection], args);
+    } else {
+      throw new Error(`replaceOne: operation not available for collection '${collection}'.`);
+    }
+    return result;
+  }
+
+  async deleteOne(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`deleteOne: no handler for collection '${collection}'.`);
+    }
+    let result = null;
+    if (handler.isMongo === true) {
+      result = await handler.collections[collection].deleteOne.apply(handler.collections[collection], args);
+    } else {
+      throw new Error(`deleteOne: operation not available for collection '${collection}'.`);
+    }
+    return result;
+  }
+
+  async deleteMany(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`deleteMany: no handler for collection '${collection}'.`);
+    }
+    let result = null;
+    if (handler.isMongo === true) {
+      result = await handler.collections[collection].deleteMany.apply(handler.collections[collection], args);
+    } else {
+      throw new Error(`deleteMany: operation not available for collection '${collection}'.`);
+    }
+    return result;
+  }
+
+  async dropIndexes(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`dropIndexes: no handler for collection '${collection}'.`);
+    }
+    let result = null;
+    if (handler.isMongo === true) {
+      result = await handler.collections[collection].dropIndexes.apply(handler.collections[collection], args);
+    } else {
+      throw new Error(`dropIndexes: operation not available for collection '${collection}'.`);
+    }
+    return result;
+  }
+
+  async createIndex(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    if (!handler.collections[collection]) {
+      throw new Error(`createIndex: no handler for collection '${collection}'.`);
+    }
+    let result = null;
+    if (handler.isMongo === true) {
+      result = await handler.collections[collection].createIndex.apply(handler.collections[collection], args);
+    } else {
+      throw new Error(`createIndex: operation not available for collection '${collection}'.`);
+    }
+    return result;
+  }
+}
+
+exports.Database = new Database();
+exports.ObjectId = ObjectId;

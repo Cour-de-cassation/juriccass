@@ -112,6 +112,9 @@ class Database {
     const handler = this.getHandler(collection);
     if (handler.connected === true) {
       await handler.connection.close();
+      for (let coll in handler.collections) {
+        handler.collections[coll] = null;
+      }
       handler.connected = false;
     }
   }
@@ -211,13 +214,17 @@ class Database {
   async find(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`find: no handler for collection '${collection}'.`);
     }
     let row;
     let result = [];
     if (handler.isMongo === true) {
-      const cursor = await handler.collections[collection].find.apply(handler.collections[collection], args);
+      const cursor = await handler.collections[shortCollectionName].find.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
       while ((row = await cursor.next())) {
         result.push(row);
       }
@@ -231,12 +238,16 @@ class Database {
   async findOne(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`findOne: no handler for collection '${collection}'.`);
     }
     let result = null;
     if (handler.isMongo === true) {
-      result = await handler.collections[collection].findOne.apply(handler.collections[collection], args);
+      result = await handler.collections[shortCollectionName].findOne.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
     } else {
       const res = await this.oracleReadQuery(collection, args);
       if (Array.isArray(res) && res.length > 0) {
@@ -249,12 +260,16 @@ class Database {
   async count(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`count: no handler for collection '${collection}'.`);
     }
     let result = 0;
     if (handler.isMongo === true) {
-      result = await handler.collections[collection].countDocuments.apply(handler.collections[collection], args);
+      result = await handler.collections[shortCollectionName].countDocuments.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
     } else {
       const res = await this.oracleReadQuery(collection, args);
       if (Array.isArray(res) && res.length > 0) {
@@ -267,12 +282,16 @@ class Database {
   async insertOne(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`insertOne: no handler for collection '${collection}'.`);
     }
     let result = null;
     if (handler.isMongo === true) {
-      result = await handler.collections[collection].insertOne.apply(handler.collections[collection], args);
+      result = await handler.collections[shortCollectionName].insertOne.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
     } else {
       throw new Error(`insertOne: operation not available for collection '${collection}'.`);
     }
@@ -282,12 +301,16 @@ class Database {
   async replaceOne(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`replaceOne: no handler for collection '${collection}'.`);
     }
     let result = null;
     if (handler.isMongo === true) {
-      result = await handler.collections[collection].replaceOne.apply(handler.collections[collection], args);
+      result = await handler.collections[shortCollectionName].replaceOne.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
     } else {
       throw new Error(`replaceOne: operation not available for collection '${collection}'.`);
     }
@@ -297,12 +320,16 @@ class Database {
   async deleteOne(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`deleteOne: no handler for collection '${collection}'.`);
     }
     let result = null;
     if (handler.isMongo === true) {
-      result = await handler.collections[collection].deleteOne.apply(handler.collections[collection], args);
+      result = await handler.collections[shortCollectionName].deleteOne.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
     } else {
       throw new Error(`deleteOne: operation not available for collection '${collection}'.`);
     }
@@ -312,12 +339,16 @@ class Database {
   async deleteMany(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`deleteMany: no handler for collection '${collection}'.`);
     }
     let result = null;
     if (handler.isMongo === true) {
-      result = await handler.collections[collection].deleteMany.apply(handler.collections[collection], args);
+      result = await handler.collections[shortCollectionName].deleteMany.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
     } else {
       throw new Error(`deleteMany: operation not available for collection '${collection}'.`);
     }
@@ -327,12 +358,16 @@ class Database {
   async dropIndexes(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`dropIndexes: no handler for collection '${collection}'.`);
     }
     let result = null;
     if (handler.isMongo === true) {
-      result = await handler.collections[collection].dropIndexes.apply(handler.collections[collection], args);
+      result = await handler.collections[shortCollectionName].dropIndexes.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
     } else {
       throw new Error(`dropIndexes: operation not available for collection '${collection}'.`);
     }
@@ -342,12 +377,16 @@ class Database {
   async createIndex(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
       throw new Error(`createIndex: no handler for collection '${collection}'.`);
     }
     let result = null;
     if (handler.isMongo === true) {
-      result = await handler.collections[collection].createIndex.apply(handler.collections[collection], args);
+      result = await handler.collections[shortCollectionName].createIndex.apply(
+        handler.collections[shortCollectionName],
+        args,
+      );
     } else {
       throw new Error(`createIndex: operation not available for collection '${collection}'.`);
     }

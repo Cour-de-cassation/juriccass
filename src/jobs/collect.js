@@ -4,15 +4,18 @@ const jobId = require('path').basename(__filename, '.js');
 const logger = Logger.child({
   jobName: jobId,
 });
-
-const { Database, ObjectId } = require('../modules/database');
+const { Collector } = require('../modules/collector');
 
 async function main() {
-  logger.info('test');
+  let decisions;
 
-  // const test = await Database.findOne('si.jurinet', 'SELECT * FROM DOCUMENT WHERE ID_DOCUMENT=1899265');
-  const test = await Database.findOne('sder.rawJurinet', { _id: 1899265 });
-  console.log(test);
+  if (process.env.USE_DBSDER_API) {
+    logger.info('Collect using DBSDER API');
+    decisions = await Collector.collectNewDecisionsFromAPI();
+  } else {
+    logger.info('Collect using direct DB access');
+    decisions = await Collector.collectNewDecisionsFromDB();
+  }
 }
 
 main();

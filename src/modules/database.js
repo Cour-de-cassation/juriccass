@@ -82,9 +82,7 @@ class Database {
     const handler = this.getHandler(collection);
     if (handler.connected === false) {
       if (handler.isMongo === true) {
-        handler.connection = new MongoClient(this.getDbURI(collection), {
-          useUnifiedTopology: true,
-        });
+        handler.connection = new MongoClient(this.getDbURI(collection));
         await handler.connection.connect();
         handler.client = handler.connection.db(this.getDbName(collection));
         for (let coll in handler.collections) {

@@ -100,6 +100,9 @@ class Database {
           password: password,
           connectString: host,
         });
+        for (let coll in handler.collections) {
+          handler.collections[coll] = true;
+        }
         handler.connected = true;
       }
     }
@@ -208,7 +211,7 @@ class Database {
   async find(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`find: no handler for collection '${collection}'.`);
     }
     let row;
@@ -228,7 +231,7 @@ class Database {
   async findOne(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`findOne: no handler for collection '${collection}'.`);
     }
     let result = null;
@@ -246,7 +249,7 @@ class Database {
   async count(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`count: no handler for collection '${collection}'.`);
     }
     let result = 0;
@@ -264,7 +267,7 @@ class Database {
   async insertOne(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`insertOne: no handler for collection '${collection}'.`);
     }
     let result = null;
@@ -279,7 +282,7 @@ class Database {
   async replaceOne(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`replaceOne: no handler for collection '${collection}'.`);
     }
     let result = null;
@@ -294,7 +297,7 @@ class Database {
   async deleteOne(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`deleteOne: no handler for collection '${collection}'.`);
     }
     let result = null;
@@ -309,7 +312,7 @@ class Database {
   async deleteMany(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`deleteMany: no handler for collection '${collection}'.`);
     }
     let result = null;
@@ -324,7 +327,7 @@ class Database {
   async dropIndexes(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`dropIndexes: no handler for collection '${collection}'.`);
     }
     let result = null;
@@ -339,7 +342,7 @@ class Database {
   async createIndex(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
-    if (!handler.collections[collection]) {
+    if (!handler.collections[collection.replace(/^\w+\./i, '')]) {
       throw new Error(`createIndex: no handler for collection '${collection}'.`);
     }
     let result = null;

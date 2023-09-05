@@ -28,6 +28,7 @@
     "iconv-lite": "^0.6.3",
     "joi": "^17.10.0",
     "luxon": "^3.2.1",
+    "mongodb": "^6.0.0",
     "oracledb": "^5.5.0",
     "pino": "^8.8.0",
     "reflect-metadata": "^0.1.13",

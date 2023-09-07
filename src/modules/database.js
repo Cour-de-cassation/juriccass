@@ -29,11 +29,12 @@ class Database {
       },
       si: {
         isMongo: false,
-        connected: false,
         connection: null,
-        client: null,
         collections: {
           jurinet: null,
+          jurica: null,
+          penal: null,
+          com: null,
         },
       },
     };
@@ -59,8 +60,17 @@ class Database {
     if (/^index\./i.test(collection) === true) {
       return process.env.INDEX_DB_URI;
     }
-    if (/^si\./i.test(collection) === true) {
-      return process.env.SI_DB_URI;
+    if (/^si\.jurinet/i.test(collection) === true) {
+      return process.env.SI_JURINET_DB_URI;
+    }
+    if (/^si\.jurica/i.test(collection) === true) {
+      return process.env.SI_JURICA_DB_URI;
+    }
+    if (/^si\.penal/i.test(collection) === true) {
+      return process.env.SI_PENAL_DB_URI;
+    }
+    if (/^si\.com/i.test(collection) === true) {
+      return process.env.SI_COM_DB_URI;
     }
     throw new Error(`getDbURI: no database URI for collection '${collection}'.`);
   }
@@ -72,16 +82,25 @@ class Database {
     if (/^index\./i.test(collection) === true) {
       return process.env.INDEX_DB_NAME;
     }
-    if (/^si\./i.test(collection) === true) {
-      return process.env.SI_DB_NAME;
+    if (/^si\.jurinet/i.test(collection) === true) {
+      return process.env.SI_JURINET_DB_NAME;
+    }
+    if (/^si\.jurica/i.test(collection) === true) {
+      return process.env.SI_JURICA_DB_NAME;
+    }
+    if (/^si\.penal/i.test(collection) === true) {
+      return process.env.SI_PENAL_DB_NAME;
+    }
+    if (/^si\.com/i.test(collection) === true) {
+      return process.env.SI_COM_DB_NAME;
     }
     throw new Error(`getDbName: no database name for collection '${collection}'.`);
   }
 
   async connect(collection) {
     const handler = this.getHandler(collection);
-    if (handler.connected === false) {
-      if (handler.isMongo === true) {
+    if (handler.isMongo === true) {
+      if (handler.connected === false) {
         handler.connection = new MongoClient(this.getDbURI(collection));
         await handler.connection.connect();
         handler.client = handler.connection.db(this.getDbName(collection));
@@ -89,31 +108,36 @@ class Database {
           handler.collections[coll] = handler.client.collection(coll);
         }
         handler.connected = true;
-      } else {
-        // URI format : user:password@connectString
-        const [login, host] = this.getDbURI(collection).split('@');
-        const [user, password] = login.split(':');
-        handler.connection = await oracledb.getConnection({
-          user: user,
-          password: password,
-          connectString: host,
-        });
-        for (let coll in handler.collections) {
-          handler.collections[coll] = true;
-        }
-        handler.connected = true;
+      }
+    } else {
+      const [login, host] = this.getDbURI(collection).split('@');
+      const [user, password] = login.split(':');
+      handler.connection = await oracledb.getConnection({
+        user: user,
+        password: password,
+        connectString: host,
+      });
+      for (let coll in handler.collections) {
+        handler.collections[coll] = true;
       }
     }
   }
 
   async close(collection) {
     const handler = this.getHandler(collection);
-    if (handler.connected === true) {
+    if (handler.isMongo === true) {
+      if (handler.connected === true) {
+        await handler.connection.close();
+        for (let coll in handler.collections) {
+          handler.collections[coll] = null;
+        }
+        handler.connected = false;
+      }
+    } else {
       await handler.connection.close();
       for (let coll in handler.collections) {
         handler.collections[coll] = null;
       }
-      handler.connected = false;
     }
   }
 

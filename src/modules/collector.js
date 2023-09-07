@@ -254,10 +254,12 @@ class Collector {
           } else {
             const found = await Database.findOne('sder.rawJurinet', { _id: decision.ID_DOCUMENT });
             if (found === null) {
+              console.log('add', decision);
               filtered.collected.push({
                 decision: decision,
               });
             } else {
+              console.log('skip', decision);
               filtered.rejected.push({
                 decision: decision,
                 reason: 'decision already collected',

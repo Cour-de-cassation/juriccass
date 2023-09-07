@@ -14,7 +14,6 @@ async function main() {
   } else {
     logger.info('Collect using direct DB access');
     decisions = await Collector.collectNewDecisionsFromDB();
-    console.log(decisions);
   }
 
   process.exit(0);

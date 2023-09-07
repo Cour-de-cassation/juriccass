@@ -232,7 +232,8 @@ class Collector {
       collected: [],
       rejected: [],
     };
-    decisions.forEach(async (decision) => {
+    for (let i = 0; i < decisions.length; i++) {
+      const decision = decisions[i];
       if (
         decision.TYPE_ARRET === 'CC' ||
         (decision.TYPE_ARRET === 'AUTRE' &&
@@ -279,7 +280,7 @@ class Collector {
           reason: 'wrong type of decision or wrong jurisdiction',
         });
       }
-    });
+    }
     return filtered;
   }
 

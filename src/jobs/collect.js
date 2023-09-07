@@ -11,10 +11,10 @@ async function main() {
   if (process.env.USE_DBSDER_API === 'ON') {
     logger.info('Collect using DBSDER API');
     decisions = await Collector.collectNewDecisionsFromAPI();
-    console.log(decisions);
   } else {
     logger.info('Collect using direct DB access');
     decisions = await Collector.collectNewDecisionsFromDB();
+    console.log(decisions);
   }
 
   process.exit(0);

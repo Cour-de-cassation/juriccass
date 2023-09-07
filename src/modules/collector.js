@@ -252,9 +252,7 @@ class Collector {
               reason: 'decision is too early',
             });
           } else {
-            console.log(decision);
             const found = await Database.findOne('sder.rawJurinet', { _id: decision.ID_DOCUMENT });
-            console.log(found);
             if (found === null) {
               filtered.collected.push({
                 decision: decision,

@@ -19,9 +19,7 @@ class Collector {
       `SELECT *
       FROM DOCUMENT
       WHERE DOCUMENT.XML IS NOT NULL
-      AND DOCUMENT.XMLA IS NULL
-      AND DOCUMENT.IND_ANO = 0
-      AND DOCUMENT.DT_CREATION >= TO_DATE('${formattedOneMonthAgo}', 'DD/MM/YYYY')
+     AND DOCUMENT.DT_CREATION >= TO_DATE('${formattedOneMonthAgo}', 'DD/MM/YYYY')
       ORDER BY DOCUMENT.ID_DOCUMENT ASC`,
     );
 

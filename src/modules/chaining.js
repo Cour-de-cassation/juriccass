@@ -52,7 +52,7 @@ class Chaining {
         });
       }
     } catch (e) {
-      logger.error(e);
+      logger.warn(e);
       return null;
     }
   }

@@ -35,7 +35,7 @@ class Chaining {
           `SELECT *
           FROM JCA_DECISION
           WHERE REGEXP_LIKE(JCA_DECISION.JDEC_NUM_RG, '^0*${RGTerms[0]}/0*${RGTerms[1]} *$')
-          AND JCA_DECISION.JDEC_DATE = '${strDecatt}'`,
+          AND JCA_DECISION.JDEC_DATE = '${strDecattDate}'`,
           [],
         );
 

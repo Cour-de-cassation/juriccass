@@ -19,13 +19,16 @@ class Collector {
       `SELECT *
       FROM DOCUMENT
       WHERE DOCUMENT.XML IS NOT NULL
-     AND DOCUMENT.DT_CREATION >= TO_DATE('${formattedOneMonthAgo}', 'DD/MM/YYYY')
+      AND DOCUMENT.XMLA IS NULL
+      AND DOCUMENT.IND_ANO = 0
+      AND DOCUMENT.DT_CREATION >= TO_DATE('${formattedOneMonthAgo}', 'DD/MM/YYYY')
       ORDER BY DOCUMENT.ID_DOCUMENT ASC`,
     );
 
-    decisions.forEach(async (decision) => {
-      decision = await this.completeDecisionFromDB(decision);
-    });
+    for (let i = 0; i < decisions.length; i++) {
+      // console.log(decisions[i]);
+      decisions[i] = await this.completeDecisionFromDB(decisions[i]);
+    }
 
     return await this.filterCollectedDecisionsFromDB(decisions);
   }

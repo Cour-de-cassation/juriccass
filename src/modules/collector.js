@@ -1,6 +1,8 @@
 const { Database } = require('./database');
 const { DateTime } = require('luxon');
 const { Chaining } = require('./chaining');
+const fs = require('fs');
+const path = require('path');
 
 class Collector {
   constructor() {}
@@ -228,13 +230,23 @@ class Collector {
   }
 
   async filterCollectedDecisionsFromDB(decisions) {
+    let whitelist = [];
+
+    try {
+      whitelist = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'settings', 'id_whitelist.json')).toString());
+    } catch (ignore) {}
+
+    console.log(whitelist);
+
     const filtered = {
       collected: [],
       rejected: [],
     };
+
     for (let i = 0; i < decisions.length; i++) {
       const decision = decisions[i];
       if (
+        whitelist.indexOf(decision.ID_DOCUMENT) !== -1 ||
         decision.TYPE_ARRET === 'CC' ||
         (decision.TYPE_ARRET === 'AUTRE' &&
           (/^t\.cfl$/i.test(decision['ID_CHAMBRE']) === true || /judiciaire.*paris$/i.test(decision.JURIDICTION)))
@@ -243,19 +255,19 @@ class Collector {
           let inDate = new Date(Date.parse(decision.DT_DECISION.toISOString()));
           inDate.setHours(inDate.getHours() + 2);
           inDate = DateTime.fromJSDate(inDate);
-          if (inDate.diffNow('months').toObject().months <= -6) {
+          if (whitelist.indexOf(decision.ID_DOCUMENT) === -1 && inDate.diffNow('months').toObject().months <= -6) {
             filtered.rejected.push({
               decision: decision,
               reason: 'decision is too old',
             });
-          } else if (inDate.diffNow('days').toObject().days > 1) {
+          } else if (whitelist.indexOf(decision.ID_DOCUMENT) === -1 && inDate.diffNow('days').toObject().days > 1) {
             filtered.rejected.push({
               decision: decision,
               reason: 'decision is too early',
             });
           } else {
             const found = await Database.findOne('sder.rawJurinet', { _id: decision.ID_DOCUMENT });
-            if (found === null) {
+            if (whitelist.indexOf(decision.ID_DOCUMENT) !== -1 || found === null) {
               console.log('add', decision);
               filtered.collected.push({
                 decision: decision,

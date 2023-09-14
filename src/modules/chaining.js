@@ -51,8 +51,7 @@ class Chaining {
           return self.indexOf(value) === index;
         });
       }
-    } catch (e) {
-      // logger.warn(e);
+    } catch (ignore) {
       return null;
     }
   }

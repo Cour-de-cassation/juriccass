@@ -28,7 +28,6 @@ class Collector {
     );
 
     for (let i = 0; i < decisions.length; i++) {
-      // console.log(decisions[i]);
       decisions[i] = await this.completeDecisionFromDB(decisions[i]);
     }
 
@@ -233,7 +232,9 @@ class Collector {
     let whitelist = [];
 
     try {
-      whitelist = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'settings', 'id_whitelist.json')).toString());
+      whitelist = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '..', '..', 'settings', 'id_whitelist.json')).toString(),
+      );
     } catch (ignore) {}
 
     console.log(whitelist);
@@ -268,12 +269,10 @@ class Collector {
           } else {
             const found = await Database.findOne('sder.rawJurinet', { _id: decision.ID_DOCUMENT });
             if (whitelist.indexOf(decision.ID_DOCUMENT) !== -1 || found === null) {
-              console.log('add', decision);
               filtered.collected.push({
                 decision: decision,
               });
             } else {
-              console.log('skip', decision);
               filtered.rejected.push({
                 decision: decision,
                 reason: 'decision already collected',

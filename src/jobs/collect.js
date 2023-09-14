@@ -6,16 +6,32 @@ const logger = Logger.child({
 const { Collector } = require('../modules/collector');
 
 async function main() {
+  logger.info('Start');
   let decisions;
 
-  if (process.env.USE_DBSDER_API === 'ON') {
-    logger.info('Collect using DBSDER API');
-    decisions = await Collector.collectNewDecisionsFromAPI();
+  if (process.env.USE_SI_API === 'ON') {
+    logger.info('Collect using SI API');
+    decisions = await Collector.collectNewDecisionsUsingAPI();
   } else {
     logger.info('Collect using direct DB access');
-    decisions = await Collector.collectNewDecisionsFromDB();
+    decisions = await Collector.collectNewDecisionsUsingDB();
   }
 
+  if (decisions && decisions.collected && Array.isArray(decisions.collected) && decisions.collected.length > 0) {
+    logger.info(`${decisions.collected.length} decision(s) collected`);
+
+    if (process.env.USE_DBSDER_API === 'ON') {
+      logger.info('Store and normalize using DBSDER API');
+      await Collector.storeAndNormalizeDecisionsUsingAPI(decisions.collected);
+    } else {
+      logger.info('Store and normalize using direct DB access');
+      await Collector.storeAndNormalizeDecisionsUsingDB(decisions.collected);
+    }
+  } else {
+    logger.info('No decision collected');
+  }
+
+  logger.info('End');
   process.exit(0);
 }
 

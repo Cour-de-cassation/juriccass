@@ -1,13 +1,14 @@
 const { Database } = require('./database');
 const { DateTime } = require('luxon');
 const { Chaining } = require('./chaining');
+const { Indexing } = require('./indexing');
 const fs = require('fs');
 const path = require('path');
 
 class Collector {
   constructor() {}
 
-  async collectNewDecisionsFromDB() {
+  async collectNewDecisionsUsingDB() {
     let oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     oneMonthAgo.setHours(0, 0, 0, 0);
@@ -28,13 +29,13 @@ class Collector {
     );
 
     for (let i = 0; i < decisions.length; i++) {
-      decisions[i] = await this.completeDecisionFromDB(decisions[i]);
+      decisions[i] = await this.completeDecisionUsingDB(decisions[i]);
     }
 
-    return await this.filterCollectedDecisionsFromDB(decisions);
+    return await this.filterCollectedDecisionsUsingDB(decisions);
   }
 
-  async completeDecisionFromDB(decision) {
+  async completeDecisionUsingDB(decision) {
     decision._portalis = null;
 
     // Inject "titrage" data (if any) into the document:
@@ -92,7 +93,7 @@ class Collector {
     }
 
     // Inject "decatt" data (if any) into the document:
-    decision._decatt = await Chaining.getDecAttFromDB(decision.ID_DOCUMENT);
+    decision._decatt = await Chaining.getDecAttUsingDB(decision.ID_DOCUMENT);
 
     // Inject "bloc_occultation" data (if any) into the document:
     try {
@@ -228,7 +229,7 @@ class Collector {
     return decision;
   }
 
-  async filterCollectedDecisionsFromDB(decisions) {
+  async filterCollectedDecisionsUsingDB(decisions) {
     let whitelist = [];
 
     try {
@@ -244,8 +245,6 @@ class Collector {
 
     for (let i = 0; i < decisions.length; i++) {
       const decision = decisions[i];
-
-      console.log(decision.ID_DOCUMENT, typeof decision.ID_DOCUMENT, whitelist[0], typeof whitelist[0]);
 
       if (
         whitelist.indexOf(decision.ID_DOCUMENT) !== -1 ||
@@ -296,10 +295,32 @@ class Collector {
     return filtered;
   }
 
-  async collectNewDecisionsFromAPI() {
-    const batch = [];
-    // @TODO
-    return batch;
+  async storeAndNormalizeDecisionsUsingDB(decisions) {
+    for (let i = 0; i < decisions.length; i++) {
+      let decision = decisions[i];
+      decision._indexed = null;
+
+      await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
+
+      await Indexing.indexDecision('jurinet', decision, null, 'import in rawJurinet');
+
+      await Indexing.indexAffaire('jurinet', decision);
+    }
+    return true;
+  }
+
+  // @TODO
+  async collectNewDecisionsUsingAPI() {
+    const decisions = {
+      collected: [],
+      rejected: [],
+    };
+    return decisions;
+  }
+
+  // @TODO
+  async storeAndNormalizeDecisionsUsingAPI(decisions) {
+    return true;
   }
 }
 

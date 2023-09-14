@@ -1,19 +1,16 @@
 const { Database } = require('./database');
-const { Logger } = require('./logger');
-const logger = Logger.child({
-  moduleName: require('path').basename(__filename, '.js'),
-});
+
 class Chaining {
   constructor() {}
 
-  async getDecAttFromDB(id) {
+  async getDecAttUsingDB(id) {
     try {
       const results = [];
       const decAttInfo = await this.getDecAttInfo(id);
 
       for (let i = 0; i < decAttInfo.length; i++) {
         if (!decAttInfo[i] || !decAttInfo[i].NUM_RG || !decAttInfo[i].DT_DECATT) {
-          throw new Error(`Chaining.getDecAttFromDB: empty or invalid chaining info for CC decision '${id}.`);
+          throw new Error(`Chaining.getDecAttUsingDB: empty or invalid chaining info for CC decision '${id}.`);
         }
 
         let decAttDate = new Date(Date.parse(decAttInfo[i].DT_DECATT));
@@ -44,7 +41,7 @@ class Chaining {
             results.push(decAttResult[j].JDEC_ID);
           }
         } else {
-          throw new Error(`Chaining.getDecAttFromDB: contested CA decision related to CC decision '${id} not found.`);
+          throw new Error(`Chaining.getDecAttUsingDB: contested CA decision related to CC decision '${id} not found.`);
         }
 
         return results.filter((value, index, self) => {

@@ -237,8 +237,6 @@ class Collector {
       );
     } catch (ignore) {}
 
-    console.log(whitelist);
-
     const filtered = {
       collected: [],
       rejected: [],
@@ -246,6 +244,9 @@ class Collector {
 
     for (let i = 0; i < decisions.length; i++) {
       const decision = decisions[i];
+
+      console.log(decision.ID_DOCUMENT, typeof decision.ID_DOCUMENT);
+
       if (
         whitelist.indexOf(decision.ID_DOCUMENT) !== -1 ||
         decision.TYPE_ARRET === 'CC' ||

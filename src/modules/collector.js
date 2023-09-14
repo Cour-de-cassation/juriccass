@@ -245,7 +245,7 @@ class Collector {
     for (let i = 0; i < decisions.length; i++) {
       const decision = decisions[i];
 
-      console.log(decision.ID_DOCUMENT, typeof decision.ID_DOCUMENT);
+      console.log(decision.ID_DOCUMENT, typeof decision.ID_DOCUMENT, whitelist[0], typeof whitelist[0]);
 
       if (
         whitelist.indexOf(decision.ID_DOCUMENT) !== -1 ||

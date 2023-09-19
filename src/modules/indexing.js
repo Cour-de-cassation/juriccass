@@ -7,13 +7,14 @@ const logger = Logger.child({
 class Indexing {
   constructor() {}
 
-  async indexDecision(source, decision, error, message) {
+  async indexDecision(source, decision, duplicateId, message, error) {
     try {
       return await axios.post(`${process.env.INDEX_URI}/indexDecision`, {
         source: source,
         decision: decision,
-        error: error,
+        duplicateId: duplicateId,
         message: message,
+        error: error,
       });
     } catch (e) {
       logger.error(e);

@@ -302,9 +302,9 @@ class Collector {
 
       await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
 
-      await Indexing.indexDecision('jurinet', decision, null, 'import in rawJurinet');
+      await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet');
 
-      await Indexing.indexAffaire('jurinet', decision);
+      await Indexing.indexAffaire('cc', decision);
     }
     return true;
   }

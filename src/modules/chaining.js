@@ -108,8 +108,8 @@ class Chaining {
           );
           if (decAtts && decAtts.length > 0) {
             for (let i = 0; i < decAtts.length; i++) {
-              decAtts[i]['ID_DOCUMENT'] = id;
-              decAtts[i]['ID_ELMSTR'] = affaire.ID_ELMSTR;
+              decAtts[i].ID_DOCUMENT = id;
+              decAtts[i].ID_ELMSTR = affaire.ID_ELMSTR;
             }
             return decAtts;
           } else {

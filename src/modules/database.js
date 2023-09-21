@@ -14,6 +14,8 @@ class Database {
         client: null,
         collections: {
           decisions: null,
+          rawDILA: null,
+          rawJurica: null,
           rawJurinet: null,
         },
       },

@@ -250,7 +250,7 @@ class Collector {
         whitelist.indexOf(decision.ID_DOCUMENT) !== -1 ||
         decision.TYPE_ARRET === 'CC' ||
         (decision.TYPE_ARRET === 'AUTRE' &&
-          (/^t\.cfl$/i.test(decision['ID_CHAMBRE']) === true || /judiciaire.*paris$/i.test(decision.JURIDICTION)))
+          (/^t\.cfl$/i.test(decision.ID_CHAMBRE) === true || /judiciaire.*paris$/i.test(decision.JURIDICTION)))
       ) {
         try {
           let inDate = new Date(Date.parse(decision.DT_DECISION.toISOString()));

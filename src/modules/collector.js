@@ -4,6 +4,10 @@ const { Chaining } = require('./chaining');
 const { Indexing } = require('./indexing');
 const fs = require('fs');
 const path = require('path');
+const { Logger } = require('./logger');
+const logger = Logger.child({
+  moduleName: require('path').basename(__filename, '.js'),
+});
 
 class Collector {
   constructor() {}
@@ -299,12 +303,37 @@ class Collector {
     for (let i = 0; i < decisions.length; i++) {
       let decision = decisions[i];
       decision._indexed = null;
-
-      await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
-
-      await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet');
-
-      await Indexing.indexAffaire('cc', decision);
+      try {
+        await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
+        await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet');
+        await Indexing.indexAffaire('cc', decision);
+        let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
+        if (normalized === null) {
+          let normDec = await Indexing.normalizeDecision(decision, null, false, true);
+          const insertResult = await Database.insertOne('sder.decisions', normDec, { bypassDocumentValidation: true });
+          normDec._id = insertResult.insertedId;
+          await Indexing.indexDecision('sder', normDec, null, 'import in decisions');
+          await Database.rawQuery(
+            'si.jurinet',
+            `UPDATE DOCUMENT
+            SET IND_ANO = :pending
+            WHERE ID_DOCUMENT = :id`,
+            [1, decision._id],
+            { autoCommit: true },
+          );
+        }
+      } catch (e) {
+        await Indexing.updateDecision('cc', decision, null, null, e);
+        await Database.rawQuery(
+          'si.jurinet',
+          `UPDATE DOCUMENT
+          SET IND_ANO = :erroneous
+          WHERE ID_DOCUMENT = :id`,
+          [4, decision._id],
+          { autoCommit: true },
+        );
+        logger.error(`storeAndNormalizeDecisionsUsingDB error for decision ${decision._id}`, e);
+      }
     }
     return true;
   }

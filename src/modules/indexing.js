@@ -22,9 +22,38 @@ class Indexing {
     }
   }
 
+  async updateDecision(source, decision, duplicateId, message, error) {
+    try {
+      return await axios.post(`${process.env.INDEX_URI}/updateDecision`, {
+        source: source,
+        decision: decision,
+        duplicateId: duplicateId,
+        message: message,
+        error: error,
+      });
+    } catch (e) {
+      logger.error(e);
+      return false;
+    }
+  }
+
   async indexAffaire(source, decision) {
     try {
       return await axios.post(`${process.env.INDEX_URI}/indexAffaire`, { source: source, decision: decision });
+    } catch (e) {
+      logger.error(e);
+      return false;
+    }
+  }
+
+  async normalizeDecision(decision, previousDecision, ignorePreviousContent, cleanContent) {
+    try {
+      return await axios.post(`${process.env.INDEX_URI}/normalizeDecision`, {
+        decision: decision,
+        previousDecision: previousDecision,
+        ignorePreviousContent: ignorePreviousContent,
+        cleanContent: cleanContent,
+      });
     } catch (e) {
       logger.error(e);
       return false;

@@ -159,7 +159,11 @@ class Database {
           break;
         default:
           if (row[key] && typeof row[key].getData === 'function') {
-            data[key] = await row[key].getData();
+            try {
+              data[key] = await row[key].getData();
+            } catch (ignore) {
+              data[key] = null;
+            }
           } else {
             data[key] = row[key];
           }
@@ -219,6 +223,26 @@ class Database {
     return [query, params];
   }
 
+  buildOracleRawQuery(collection, args) {
+    let query = `SELECT * FROM ${this.getDbName(collection)}`;
+    let params = [];
+    if (Array.isArray(args)) {
+      if (args.length === 1) {
+        if (typeof args[0] === 'string') {
+          query = args[0];
+        }
+      } else if (args.length === 2) {
+        if (typeof args[0] === 'string') {
+          query = args[0];
+        }
+        if (Array.isArray(args[1])) {
+          params = args[1];
+        }
+      }
+    }
+    return [query, params];
+  }
+
   async oracleReadQuery(collection, args) {
     const handler = this.getHandler(collection);
     let row;
@@ -232,6 +256,38 @@ class Database {
       result.push(await this.convertFromOracle(row));
     }
     await rows.close();
+    return result;
+  }
+
+  async oracleRawQuery(collection, args) {
+    const handler = this.getHandler(collection);
+    let row;
+    const result = [];
+    const [query, params] = this.buildOracleRawQuery(collection, args);
+    const rs = await handler.connection.execute(query, params, {
+      resultSet: true,
+    });
+    const rows = rs.resultSet;
+    while ((row = await rows.getRow())) {
+      result.push(await this.convertFromOracle(row));
+    }
+    await rows.close();
+    return result;
+  }
+
+  async rawQuery(collection, ...args) {
+    await this.connect(collection);
+    const handler = this.getHandler(collection);
+    const shortCollectionName = collection.replace(/^\w+\./i, '');
+    if (!handler.collections[shortCollectionName]) {
+      throw new Error(`rawQuery: no handler for collection '${collection}'.`);
+    }
+    let result = [];
+    if (handler.isMongo === true) {
+      throw new Error(`rawQuery: operation not available for collection '${collection}'.`);
+    } else {
+      result = await this.oracleRawQuery(collection, args);
+    }
     return result;
   }
 

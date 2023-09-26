@@ -39,6 +39,28 @@ class Collector {
     return await this.filterCollectedDecisionsUsingDB(decisions);
   }
 
+  async getUpdatedDecisionsUsingDB(lastDate) {
+    const date = lastDate.toJSDate();
+    let strDate = date.getDate() < 10 ? '0' + date.getDate() : date.getDate();
+    strDate += '/' + (date.getMonth() + 1 < 10 ? '0' + (date.getMonth() + 1) : date.getMonth() + 1);
+    strDate += '/' + date.getFullYear();
+
+    const decisions = await Database.find(
+      'si.jurinet',
+      `SELECT *
+      FROM DOCUMENT
+      WHERE DOCUMENT.XML IS NOT NULL
+      AND DOCUMENT.DT_MODIF > TO_DATE('${strDate}', 'DD/MM/YYYY')
+      ORDER BY DOCUMENT.ID_DOCUMENT ASC`,
+    );
+
+    for (let i = 0; i < decisions.length; i++) {
+      decisions[i] = await this.completeDecisionUsingDB(decisions[i]);
+    }
+
+    return await this.filterCollectedDecisionsUsingDB(decisions);
+  }
+
   async completeDecisionUsingDB(decision) {
     decision._portalis = null;
 
@@ -299,7 +321,7 @@ class Collector {
     return filtered;
   }
 
-  async storeAndNormalizeDecisionsUsingDB(decisions) {
+  async storeAndNormalizeNewDecisionsUsingDB(decisions) {
     for (let i = 0; i < decisions.length; i++) {
       let decision = decisions[i];
       decision._indexed = null;
@@ -348,7 +370,16 @@ class Collector {
   }
 
   // @TODO
-  async storeAndNormalizeDecisionsUsingAPI(decisions) {
+  async getUpdatedDecisionsUsingAPI(lastDate) {
+    const decisions = {
+      updated: [],
+      rejected: [],
+    };
+    return decisions;
+  }
+
+  // @TODO
+  async storeAndNormalizeNewDecisionsUsingAPI(decisions) {
     return true;
   }
 }

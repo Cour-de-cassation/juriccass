@@ -22,10 +22,10 @@ async function main() {
 
     if (process.env.USE_DBSDER_API === 'ON') {
       logger.info('Store and normalize using DBSDER API');
-      await Collector.storeAndNormalizeDecisionsUsingAPI(decisions.collected);
+      await Collector.storeAndNormalizeNewDecisionsUsingDB(decisions.collected);
     } else {
       logger.info('Store and normalize using direct DB access');
-      await Collector.storeAndNormalizeDecisionsUsingDB(decisions.collected);
+      await Collector.storeAndNormalizeNewDecisionsUsingDB(decisions.collected);
     }
   } else {
     logger.info('No decision collected');

@@ -30,19 +30,21 @@ async function main() {
     decisions = await Collector.getUpdatedDecisionsUsingDB(lastDate);
   }
 
-  if (decisions && decisions.updated && Array.isArray(decisions.updated) && decisions.updated.length > 0) {
-    logger.info(`${decisions.updated.length} decision(s) updated`);
+  if (decisions && decisions.collected && Array.isArray(decisions.collected) && decisions.collected.length > 0) {
+    logger.info(`${decisions.collected.length} decision(s) updated`);
 
     if (process.env.USE_DBSDER_API === 'ON') {
-      // XXX
+      logger.info('Store and normalize using DBSDER API');
+      await Collector.storeAndNormalizeNewDecisionsUsingDB(decisions.collected, true);
     } else {
-      // XXX
+      logger.info('Store and normalize using direct DB access');
+      await Collector.storeAndNormalizeNewDecisionsUsingDB(decisions.collected, true);
+    }
 
-      for (let i = 0; i < decisions.length; i++) {
-        let decision = decisions[i];
-        let modifTime = DateTime.fromJSDate(decision.DT_MODIF);
-        lastDate = DateTime.max(lastDate, modifTime);
-      }
+    for (let i = 0; i < decisions.collected.length; i++) {
+      let decision = decisions.collected[i].decision;
+      let modifTime = DateTime.fromJSDate(decision.DT_MODIF);
+      lastDate = DateTime.max(lastDate, modifTime);
     }
   } else {
     logger.info('No decision updated');

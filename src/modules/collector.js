@@ -58,7 +58,7 @@ class Collector {
       decisions[i] = await this.completeDecisionUsingDB(decisions[i]);
     }
 
-    return await this.filterCollectedDecisionsUsingDB(decisions);
+    return await this.filterCollectedDecisionsUsingDB(decisions, true);
   }
 
   async completeDecisionUsingDB(decision) {
@@ -255,7 +255,7 @@ class Collector {
     return decision;
   }
 
-  async filterCollectedDecisionsUsingDB(decisions) {
+  async filterCollectedDecisionsUsingDB(decisions, updated) {
     let whitelist = [];
 
     try {
@@ -278,38 +278,156 @@ class Collector {
         (decision.TYPE_ARRET === 'AUTRE' &&
           (/^t\.cfl$/i.test(decision.ID_CHAMBRE) === true || /judiciaire.*paris$/i.test(decision.JURIDICTION)))
       ) {
-        try {
-          let inDate = new Date(Date.parse(decision.DT_DECISION.toISOString()));
-          inDate.setHours(inDate.getHours() + 2);
-          inDate = DateTime.fromJSDate(inDate);
-          if (whitelist.indexOf(decision.ID_DOCUMENT) === -1 && inDate.diffNow('months').toObject().months <= -6) {
-            filtered.rejected.push({
+        if (updated === true) {
+          const found = await Database.findOne('sder.rawJurinet', { _id: decision.ID_DOCUMENT });
+          if (found === null) {
+            filtered.collected.push({
               decision: decision,
-              reason: 'decision is too old',
-            });
-          } else if (whitelist.indexOf(decision.ID_DOCUMENT) === -1 && inDate.diffNow('days').toObject().days > 1) {
-            filtered.rejected.push({
-              decision: decision,
-              reason: 'decision is too early',
+              diff: null,
             });
           } else {
-            const found = await Database.findOne('sder.rawJurinet', { _id: decision.ID_DOCUMENT });
-            if (whitelist.indexOf(decision.ID_DOCUMENT) !== -1 || found === null) {
-              filtered.collected.push({
-                decision: decision,
-              });
-            } else {
+            const updatable = [
+              'XML',
+              'TYPE_ARRET',
+              'JURIDICTION',
+              'ID_CHAMBRE',
+              'NUM_DECISION',
+              'DT_DECISION',
+              'ID_SOLUTION',
+              'TEXTE_VISE',
+              'RAPROCHEMENT',
+              'SOURCE',
+              'DOCTRINE',
+              'IND_ANO',
+              'AUT_ANO',
+              'DT_ANO',
+              'DT_MODIF',
+              'DT_MODIF_ANO',
+              'DT_ENVOI_DILA',
+              '_titrage',
+              '_analyse',
+              '_partie',
+              '_decatt',
+              '_portalis',
+              '_bloc_occultation',
+              'IND_PM',
+              'IND_ADRESSE',
+              'IND_DT_NAISSANCE',
+              'IND_DT_DECE',
+              'IND_DT_MARIAGE',
+              'IND_IMMATRICULATION',
+              'IND_CADASTRE',
+              'IND_CHAINE',
+              'IND_COORDONNEE_ELECTRONIQUE',
+              'IND_PRENOM_PROFESSIONEL',
+              'IND_NOM_PROFESSIONEL',
+              'IND_BULLETIN',
+              'IND_RAPPORT',
+              'IND_LETTRE',
+              'IND_COMMUNIQUE',
+              'ID_FORMATION',
+              'OCCULTATION_SUPPLEMENTAIRE',
+              '_natureAffaireCivil',
+              '_natureAffairePenal',
+              '_codeMatiereCivil',
+              '_nao_code',
+            ];
+            const shouldNotBeUpdated = ['XML'];
+            const triggerReprocess = [
+              'IND_PM',
+              'IND_ADRESSE',
+              'IND_DT_NAISSANCE',
+              'IND_DT_DECE',
+              'IND_DT_MARIAGE',
+              'IND_IMMATRICULATION',
+              'IND_CADASTRE',
+              'IND_CHAINE',
+              'IND_COORDONNEE_ELECTRONIQUE',
+              'IND_PRENOM_PROFESSIONEL',
+              'IND_NOM_PROFESSIONEL',
+              'OCCULTATION_SUPPLEMENTAIRE',
+              '_bloc_occultation',
+              '_natureAffaireCivil',
+              '_natureAffairePenal',
+              '_codeMatiereCivil',
+              '_nao_code',
+            ];
+            const sensitive = ['XML', '_partie', 'OCCULTATION_SUPPLEMENTAIRE'];
+            let diff = null;
+            let anomaly = false;
+            let reprocess = false;
+            updatable.forEach((key) => {
+              if (JSON.stringify(decision[key]) !== JSON.stringify(found[key])) {
+                if (diff === null) {
+                  diff = {};
+                }
+                if (sensitive.indexOf(key) !== -1) {
+                  diff[key] = {
+                    old: '[SENSITIVE]',
+                    new: '[SENSITIVE]',
+                  };
+                } else {
+                  diff[key] = {
+                    old: JSON.stringify(found[key]),
+                    new: JSON.stringify(decision[key]),
+                  };
+                }
+                if (shouldNotBeUpdated.indexOf(key) !== -1) {
+                  anomaly = true;
+                }
+                if (triggerReprocess.indexOf(key) !== -1) {
+                  reprocess = true;
+                }
+              }
+            });
+            if (diff === null) {
               filtered.rejected.push({
                 decision: decision,
-                reason: 'decision already collected',
+                reason: 'decision has no significant difference',
+              });
+            } else {
+              filtered.collected.push({
+                decision: decision,
+                diff: diff,
+                anomaly: anomaly,
+                reprocess: reprocess,
               });
             }
           }
-        } catch (e) {
-          filtered.rejected.push({
-            decision: decision,
-            reason: e.message,
-          });
+        } else {
+          try {
+            let inDate = new Date(Date.parse(decision.DT_DECISION.toISOString()));
+            inDate.setHours(inDate.getHours() + 2);
+            inDate = DateTime.fromJSDate(inDate);
+            if (whitelist.indexOf(decision.ID_DOCUMENT) === -1 && inDate.diffNow('months').toObject().months <= -6) {
+              filtered.rejected.push({
+                decision: decision,
+                reason: 'decision is too old',
+              });
+            } else if (whitelist.indexOf(decision.ID_DOCUMENT) === -1 && inDate.diffNow('days').toObject().days > 1) {
+              filtered.rejected.push({
+                decision: decision,
+                reason: 'decision is too early',
+              });
+            } else {
+              const found = await Database.findOne('sder.rawJurinet', { _id: decision.ID_DOCUMENT });
+              if (whitelist.indexOf(decision.ID_DOCUMENT) !== -1 || found === null) {
+                filtered.collected.push({
+                  decision: decision,
+                });
+              } else {
+                filtered.rejected.push({
+                  decision: decision,
+                  reason: 'decision already collected',
+                });
+              }
+            }
+          } catch (e) {
+            filtered.rejected.push({
+              decision: decision,
+              reason: e.message,
+            });
+          }
         }
       } else {
         filtered.rejected.push({
@@ -321,40 +439,140 @@ class Collector {
     return filtered;
   }
 
-  async storeAndNormalizeNewDecisionsUsingDB(decisions) {
+  async storeAndNormalizeNewDecisionsUsingDB(decisions, updated) {
     for (let i = 0; i < decisions.length; i++) {
-      let decision = decisions[i];
-      decision._indexed = null;
+      let decision = decisions[i].decision;
       try {
-        await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
-        await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet');
-        await Indexing.indexAffaire('cc', decision);
-        let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
-        if (normalized === null) {
-          let normDec = await Indexing.normalizeDecision(decision, null, false, true);
-          const insertResult = await Database.insertOne('sder.decisions', normDec, { bypassDocumentValidation: true });
-          normDec._id = insertResult.insertedId;
-          await Indexing.indexDecision('sder', normDec, null, 'import in decisions');
-          await Database.rawQuery(
-            'si.jurinet',
-            `UPDATE DOCUMENT
+        decision._indexed = null;
+        if (updated === true) {
+          if (decisions[i].diff === null) {
+            await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
+            await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet (sync)');
+          } else {
+            if (decisions[i].reprocess === true) {
+              decision.IND_ANO = 0;
+              decision.XMLA = null;
+              if (decisions[i].anomaly === true) {
+                await Indexing.updateDecision(
+                  'cc',
+                  decision,
+                  null,
+                  `update in rawJurinet and reprocessed (sync) - original text could have been changed - changelog: ${JSON.stringify(
+                    decisions[i].diff,
+                  )}`,
+                );
+              } else {
+                await Indexing.updateDecision(
+                  'cc',
+                  decision,
+                  null,
+                  `update in rawJurinet and reprocessed (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
+                );
+              }
+            } else if (decisions[i].anomaly === true) {
+              await Indexing.updateDecision(
+                'cc',
+                decision,
+                null,
+                `update in rawJurinet (sync) - original text could have been changed - changelog: ${JSON.stringify(
+                  decisions[i].diff,
+                )}`,
+              );
+            } else {
+              await Indexing.updateDecision(
+                'cc',
+                decision,
+                null,
+                `update in rawJurinet (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
+              );
+            }
+            await Database.replaceOne('sder.rawJurinet', { _id: decision._id }, decision, {
+              bypassDocumentValidation: true,
+            });
+          }
+          await Indexing.indexAffaire('cc', decision);
+
+          let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
+          if (normalized === null) {
+            let normDec = await Indexing.normalizeDecision(decision, null, false, true);
+            const insertResult = await Database.insertOne('sder.decisions', normDec, {
+              bypassDocumentValidation: true,
+            });
+            normDec._id = insertResult.insertedId;
+            await Indexing.indexDecision('sder', normDec, null, 'import in decisions (sync)');
+          } else if (normalized.locked === false && decisions[i].diff !== null) {
+            let normDec = await Indexing.normalizeDecision(decision, normalized, false, true);
+            normDec.dateCreation = new Date().toISOString();
+            normDec.zoning = null;
+            if (decisions[i].reprocess) {
+              normDec.pseudoText = undefined;
+              normDec.pseudoStatus = 0;
+              normDec.labelStatus = 'toBeTreated';
+              normDec.labelTreatments = [];
+            }
+            await Database.replaceOne('sder.decisions', { _id: normalized._id }, normDec, {
+              bypassDocumentValidation: true,
+            });
+            normDec._id = normalized._id;
+            if (decisions[i].reprocess === true) {
+              await Indexing.updateDecision(
+                'sder',
+                normDec,
+                null,
+                `update in decisions and reprocessed (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
+              );
+            } else {
+              await Indexing.updateDecision(
+                'sder',
+                normDec,
+                null,
+                `update in decisions (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
+              );
+            }
+          }
+        } else {
+          await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
+          await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet');
+          await Indexing.indexAffaire('cc', decision);
+
+          let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
+          if (normalized === null) {
+            let normDec = await Indexing.normalizeDecision(decision, null, false, true);
+            const insertResult = await Database.insertOne('sder.decisions', normDec, {
+              bypassDocumentValidation: true,
+            });
+            normDec._id = insertResult.insertedId;
+            await Indexing.indexDecision('sder', normDec, null, 'import in decisions');
+            await Database.rawQuery(
+              'si.jurinet',
+              `UPDATE DOCUMENT
             SET IND_ANO = :pending
             WHERE ID_DOCUMENT = :id`,
-            [1, decision._id],
-            { autoCommit: true },
-          );
+              [1, decision._id],
+              { autoCommit: true },
+            );
+          }
         }
       } catch (e) {
         await Indexing.updateDecision('cc', decision, null, null, e);
         await Database.rawQuery(
           'si.jurinet',
           `UPDATE DOCUMENT
-          SET IND_ANO = :erroneous
-          WHERE ID_DOCUMENT = :id`,
+        SET IND_ANO = :erroneous
+        WHERE ID_DOCUMENT = :id`,
           [4, decision._id],
           { autoCommit: true },
         );
-        logger.error(`storeAndNormalizeDecisionsUsingDB error for decision ${decision._id}`, e);
+        if (updated) {
+          logger.error(
+            `storeAndNormalizeDecisionsUsingDB error for decision ${decision._id} (sync) - changelog: ${JSON.stringify(
+              decisions[i].diff,
+            )}`,
+            e,
+          );
+        } else {
+          logger.error(`storeAndNormalizeDecisionsUsingDB error for decision ${decision._id}(collect)`, e);
+        }
       }
     }
     return true;
@@ -379,7 +597,7 @@ class Collector {
   }
 
   // @TODO
-  async storeAndNormalizeNewDecisionsUsingAPI(decisions) {
+  async storeAndNormalizeNewDecisionsUsingAPI(decisions, updated) {
     return true;
   }
 }

@@ -578,6 +578,48 @@ class Collector {
     return true;
   }
 
+  async getDecisionsToReinjectUsingDB() {
+    const decisions = {
+      collected: [],
+      rejected: [],
+    };
+
+    decisions.collected = await Database.find(
+      'sder.decisions',
+      { labelStatus: 'done', sourceName: 'jurinet' },
+      { allowDiskUse: true },
+    );
+
+    return decisions;
+  }
+
+  async reinjectUsingDB(decisions) {
+    for (let i = 0; i < decisions.length; i++) {
+      try {
+        const decision = decisions[i];
+        await jurinetSource.reinject(decision);
+        const reinjected = await jurinetSource.getDecisionByID(decision.sourceId);
+        reinjected._indexed = null;
+        reinjected.DT_ANO = new Date();
+        reinjected.DT_MODIF = new Date();
+        reinjected.DT_MODIF_ANO = new Date();
+        await rawJurinet.replaceOne({ _id: reinjected._id }, reinjected, { bypassDocumentValidation: true });
+        decision.labelStatus = 'exported';
+        decision.dateCreation = new Date().toISOString();
+        await decisions.replaceOne({ _id: decision[process.env.MONGO_ID] }, decision, {
+          bypassDocumentValidation: true,
+        });
+        await JudilibreIndex.updateDecisionDocument(decision, null, 'reinject');
+        successCount++;
+      } catch (e) {
+        logger.error(`Jurinet reinjection error processing decision ${decision._id}`, e);
+        await JudilibreIndex.updateDecisionDocument(decision, null, null, e);
+      }
+    }
+
+    return true;
+  }
+
   // @TODO
   async collectNewDecisionsUsingAPI() {
     const decisions = {
@@ -590,7 +632,7 @@ class Collector {
   // @TODO
   async getUpdatedDecisionsUsingAPI(lastDate) {
     const decisions = {
-      updated: [],
+      collected: [],
       rejected: [],
     };
     return decisions;
@@ -598,6 +640,20 @@ class Collector {
 
   // @TODO
   async storeAndNormalizeNewDecisionsUsingAPI(decisions, updated) {
+    return true;
+  }
+
+  // @TODO
+  async getDecisionsToReinjectUsingAPI() {
+    const decisions = {
+      collected: [],
+      rejected: [],
+    };
+    return decisions;
+  }
+
+  // @TODO
+  async reinjectUsingAPI(decisions) {
     return true;
   }
 }

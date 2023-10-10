@@ -446,7 +446,7 @@ class Collector {
         decision._indexed = null;
         if (updated === true) {
           if (decisions[i].diff === null) {
-            await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
+            await Database.insertOne('sder.rawJurinet', decision);
             await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet (sync)');
           } else {
             if (decisions[i].reprocess === true) {
@@ -486,18 +486,14 @@ class Collector {
                 `update in rawJurinet (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
               );
             }
-            await Database.replaceOne('sder.rawJurinet', { _id: decision._id }, decision, {
-              bypassDocumentValidation: true,
-            });
+            await Database.replaceOne('sder.rawJurinet', { _id: decision._id }, decision);
           }
           await Indexing.indexAffaire('cc', decision);
 
           let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
           if (normalized === null) {
             let normDec = await Indexing.normalizeDecision(decision, null, false, true);
-            const insertResult = await Database.insertOne('sder.decisions', normDec, {
-              bypassDocumentValidation: true,
-            });
+            const insertResult = await Database.insertOne('sder.decisions', normDec);
             normDec._id = insertResult.insertedId;
             await Indexing.indexDecision('sder', normDec, null, 'import in decisions (sync)');
           } else if (normalized.locked === false && decisions[i].diff !== null) {
@@ -510,9 +506,7 @@ class Collector {
               normDec.labelStatus = 'toBeTreated';
               normDec.labelTreatments = [];
             }
-            await Database.replaceOne('sder.decisions', { _id: normalized._id }, normDec, {
-              bypassDocumentValidation: true,
-            });
+            await Database.replaceOne('sder.decisions', { _id: normalized._id }, normDec);
             normDec._id = normalized._id;
             if (decisions[i].reprocess === true) {
               await Indexing.updateDecision(
@@ -531,37 +525,33 @@ class Collector {
             }
           }
         } else {
-          await Database.insertOne('sder.rawJurinet', decision, { bypassDocumentValidation: true });
+          await Database.insertOne('sder.rawJurinet', decision);
           await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet');
           await Indexing.indexAffaire('cc', decision);
 
           let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
           if (normalized === null) {
             let normDec = await Indexing.normalizeDecision(decision, null, false, true);
-            const insertResult = await Database.insertOne('sder.decisions', normDec, {
-              bypassDocumentValidation: true,
-            });
+            const insertResult = await Database.insertOne('sder.decisions', normDec);
             normDec._id = insertResult.insertedId;
             await Indexing.indexDecision('sder', normDec, null, 'import in decisions');
-            await Database.rawQuery(
+            await Database.writeQuery(
               'si.jurinet',
               `UPDATE DOCUMENT
-            SET IND_ANO = :pending
-            WHERE ID_DOCUMENT = :id`,
+                SET IND_ANO = :pending
+                WHERE ID_DOCUMENT = :id`,
               [1, decision._id],
-              { autoCommit: true },
             );
           }
         }
       } catch (e) {
         await Indexing.updateDecision('cc', decision, null, null, e);
-        await Database.rawQuery(
+        await Database.writeQuery(
           'si.jurinet',
           `UPDATE DOCUMENT
-        SET IND_ANO = :erroneous
-        WHERE ID_DOCUMENT = :id`,
+            SET IND_ANO = :erroneous
+            WHERE ID_DOCUMENT = :id`,
           [4, decision._id],
-          { autoCommit: true },
         );
         if (updated) {
           logger.error(
@@ -595,28 +585,76 @@ class Collector {
 
   async reinjectUsingDB(decisions) {
     for (let i = 0; i < decisions.length; i++) {
+      const decision = decisions[i];
       try {
-        const decision = decisions[i];
-        await jurinetSource.reinject(decision);
-        const reinjected = await jurinetSource.getDecisionByID(decision.sourceId);
+        // 1. Get the original decision from Jurinet:
+        const sourceDecision = await Database.findOne(
+          'si.jurinet',
+          `SELECT *
+          FROM DOCUMENT
+          WHERE DOCUMENT.ID_DOCUMENT = :id`,
+          [decision.sourceId],
+        );
+        if (sourceDecision && sourceDecision.XML) {
+          // 2. Get the content of the original XML field to create the new XMLA field:
+          let xmla = sourceDecision.XML;
+          if (xmla.indexOf('<TEXTE_ARRET>') !== -1) {
+            // 3. Reinject the <TEXTE_ARRET> tag but with the reencoded pseudonymized content,
+            let pseudoText = decision.pseudoText.replace(/&/g, '&amp;').replace(/&amp;amp;/g, '&amp;');
+            pseudoText = pseudoText.replace(/</g, '&lt;');
+            pseudoText = pseudoText.replace(/>/g, '&gt;');
+            pseudoText = pseudoText.replace(/"/g, '&quot;');
+            pseudoText = pseudoText.replace(/'/g, '&apos;');
+            xmla = xmla.replace(
+              /<TEXTE_ARRET>[\s\S]*<\/TEXTE_ARRET>/gim,
+              '<TEXTE_ARRET>' + pseudoText + '</TEXTE_ARRET>',
+            );
+            xmla = Database.encodeOracleText(xmla);
+            // 4. Set the date:
+            const now = new Date();
+            // 5. Update query (which, contrary to the doc, requires xmla to be passed as a String):
+            await Database.writeQuery(
+              'si.jurinet',
+              `UPDATE DOCUMENT
+              SET XMLA=:xmla,
+              IND_ANO=:ok,
+              AUT_ANO=:label,
+              DT_ANO=:datea,
+              DT_MODIF=:dateb,
+              DT_MODIF_ANO=:datec,
+              DT_ENVOI_DILA=NULL
+              WHERE ID_DOCUMENT=:id`,
+              [xmla.toString('binary'), 2, 'LABEL', now, now, now, decision.sourceId],
+            );
+          } else {
+            throw new Error(
+              'reinjectUsingDB: <TEXTE_ARRET> tag not found: the document could be malformed or corrupted.',
+            );
+          }
+        } else {
+          throw new Error(`reinjectUsingDB: decision '${decision.sourceId}' not found or has no XML content.`);
+        }
+        const reinjected = await Database.findOne(
+          'si.jurinet',
+          `SELECT *
+          FROM DOCUMENT
+          WHERE DOCUMENT.ID_DOCUMENT = :id`,
+          [decision.sourceId],
+        );
         reinjected._indexed = null;
         reinjected.DT_ANO = new Date();
         reinjected.DT_MODIF = new Date();
         reinjected.DT_MODIF_ANO = new Date();
-        await rawJurinet.replaceOne({ _id: reinjected._id }, reinjected, { bypassDocumentValidation: true });
+        await Database.replaceOne('sder.rawJurinet', { _id: reinjected._id }, reinjected);
         decision.labelStatus = 'exported';
         decision.dateCreation = new Date().toISOString();
-        await decisions.replaceOne({ _id: decision[process.env.MONGO_ID] }, decision, {
-          bypassDocumentValidation: true,
-        });
-        await JudilibreIndex.updateDecisionDocument(decision, null, 'reinject');
-        successCount++;
+        await Database.replaceOne('sder.decisions', { _id: decision._id }, decision);
+        await Indexing.updateDecision('sder', decision, null, `reinject`);
       } catch (e) {
         logger.error(`Jurinet reinjection error processing decision ${decision._id}`, e);
-        await JudilibreIndex.updateDecisionDocument(decision, null, null, e);
+        await Indexing.updateDecision('sder', decision, null, null, e);
       }
     }
-
     return true;
   }
 

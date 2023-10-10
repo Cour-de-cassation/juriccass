@@ -3,6 +3,10 @@ const iconv = require('iconv-lite');
 iconv.skipDecodeWarning = true;
 const oracledb = require('oracledb');
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
+const { Logger } = require('./logger');
+const logger = Logger.child({
+  moduleName: require('path').basename(__filename, '.js'),
+});
 
 class Database {
   constructor() {
@@ -168,12 +172,20 @@ class Database {
             data[key] = row[key];
           }
           if (Buffer.isBuffer(data[key])) {
-            data[key] = iconv.decode(data[key], 'CP1252');
+            data[key] = this.decodeOracleText(data[key]);
           }
           break;
       }
     }
     return data;
+  }
+
+  decodeOracleText(text) {
+    return iconv.decode(text, 'CP1252');
+  }
+
+  encodeOracleText(text) {
+    return iconv.encode(text, 'CP1252');
   }
 
   buildOracleReadQuery(collection, args) {
@@ -223,7 +235,7 @@ class Database {
     return [query, params];
   }
 
-  buildOracleRawQuery(collection, args) {
+  buildOracleWriteQuery(collection, args) {
     let query = `SELECT * FROM ${this.getDbName(collection)}`;
     let params = [];
     if (Array.isArray(args)) {
@@ -259,34 +271,29 @@ class Database {
     return result;
   }
 
-  async oracleRawQuery(collection, args) {
+  async oracleWriteQuery(collection, args) {
+    logger.warn(args, `oracleWriteQuery performed on collection ${collection}`);
     const handler = this.getHandler(collection);
-    let row;
-    const result = [];
-    const [query, params] = this.buildOracleRawQuery(collection, args);
-    const rs = await handler.connection.execute(query, params, {
-      resultSet: true,
+    let result = null;
+    const [query, params] = this.buildOracleWriteQuery(collection, args);
+    result = await handler.connection.execute(query, params, {
+      autoCommit: true,
     });
-    const rows = rs.resultSet;
-    while ((row = await rows.getRow())) {
-      result.push(await this.convertFromOracle(row));
-    }
-    await rows.close();
     return result;
   }
 
-  async rawQuery(collection, ...args) {
+  async writeQuery(collection, ...args) {
     await this.connect(collection);
     const handler = this.getHandler(collection);
     const shortCollectionName = collection.replace(/^\w+\./i, '');
     if (!handler.collections[shortCollectionName]) {
-      throw new Error(`rawQuery: no handler for collection '${collection}'.`);
+      throw new Error(`writeQuery: no handler for collection '${collection}'.`);
     }
     let result = [];
     if (handler.isMongo === true) {
-      throw new Error(`rawQuery: operation not available for collection '${collection}'.`);
+      throw new Error(`writeQuery: operation not available for collection '${collection}'.`);
     } else {
-      result = await this.oracleRawQuery(collection, args);
+      result = await this.oracleWriteQuery(collection, args);
     }
     return result;
   }
@@ -368,6 +375,9 @@ class Database {
     }
     let result = null;
     if (handler.isMongo === true) {
+      args.push({
+        bypassDocumentValidation: true,
+      });
       result = await handler.collections[shortCollectionName].insertOne.apply(
         handler.collections[shortCollectionName],
         args,
@@ -387,6 +397,9 @@ class Database {
     }
     let result = null;
     if (handler.isMongo === true) {
+      args.push({
+        bypassDocumentValidation: true,
+      });
       result = await handler.collections[shortCollectionName].replaceOne.apply(
         handler.collections[shortCollectionName],
         args,

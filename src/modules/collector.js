@@ -492,12 +492,12 @@ class Collector {
 
           let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
           if (normalized === null) {
-            let normDec = await Indexing.normalizeDecision(decision, null, false, true);
+            let normDec = await Indexing.normalizeDecision('cc', decision, null, false, true);
             const insertResult = await Database.insertOne('sder.decisions', normDec);
             normDec._id = insertResult.insertedId;
             await Indexing.indexDecision('sder', normDec, null, 'import in decisions (sync)');
           } else if (normalized.locked === false && decisions[i].diff !== null) {
-            let normDec = await Indexing.normalizeDecision(decision, normalized, false, true);
+            let normDec = await Indexing.normalizeDecision('cc', decision, normalized, false, true);
             normDec.dateCreation = new Date().toISOString();
             normDec.zoning = null;
             if (decisions[i].reprocess) {
@@ -531,7 +531,7 @@ class Collector {
 
           let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
           if (normalized === null) {
-            let normDec = await Indexing.normalizeDecision(decision, null, false, true);
+            let normDec = await Indexing.normalizeDecision('cc', decision, null, false, true);
             const insertResult = await Database.insertOne('sder.decisions', normDec);
             normDec._id = insertResult.insertedId;
             await Indexing.indexDecision('sder', normDec, null, 'import in decisions');
@@ -542,6 +542,11 @@ class Collector {
                 WHERE ID_DOCUMENT = :id`,
               [1, decision._id],
             );
+          } else {
+            logger.warn(
+              `Jurinet import anomaly: decision ${decision._id} seems new but a related SDER record ${normalized._id} already exists.`,
+            );
+            await Indexing.updateDecision('sder', normalized, null, `SDER record ${normalized._id} already exists`);
           }
         }
       } catch (e) {
@@ -561,7 +566,7 @@ class Collector {
             e,
           );
         } else {
-          logger.error(`storeAndNormalizeDecisionsUsingDB error for decision ${decision._id}(collect)`, e);
+          logger.error(`storeAndNormalizeDecisionsUsingDB error for decision ${decision._id} (collect)`, e);
         }
       }
     }

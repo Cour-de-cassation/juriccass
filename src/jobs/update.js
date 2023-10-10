@@ -14,7 +14,7 @@ async function main() {
 
   try {
     lastDate = DateTime.fromISO(
-      fs.readFileSync(path.join(__dirname, '..', '..', 'settings', 'cc.lastDate')).toString(),
+      fs.readFileSync(path.join(__dirname, '..', '..', 'settings', 'cc.lastUpdate')).toString(),
     );
   } catch (ignore) {
     lastDate = now.minus({ days: 2 });
@@ -23,10 +23,10 @@ async function main() {
   let decisions;
 
   if (process.env.USE_SI_API === 'ON') {
-    logger.info('Sync using SI API');
+    logger.info('Update using SI API');
     decisions = await Collector.getUpdatedDecisionsUsingAPI(lastDate);
   } else {
-    logger.info('Sync using direct DB access');
+    logger.info('Update using direct DB access');
     decisions = await Collector.getUpdatedDecisionsUsingDB(lastDate);
   }
 
@@ -51,7 +51,7 @@ async function main() {
   }
 
   try {
-    fs.writeFileSync(path.join(__dirname, '..', '..', 'settings', 'cc.lastDate'), lastDate.toISO());
+    fs.writeFileSync(path.join(__dirname, '..', '..', 'settings', 'cc.lastUpdate'), lastDate.toISO());
   } catch (e) {
     logger.error(e);
   }

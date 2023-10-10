@@ -492,12 +492,12 @@ class Collector {
 
           let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
           if (normalized === null) {
-            let normDec = await Indexing.normalizeDecision('cc', decision, null, false, true);
+            let normDec = (await Indexing.normalizeDecision('cc', decision, null, false, true)).result;
             const insertResult = await Database.insertOne('sder.decisions', normDec);
             normDec._id = insertResult.insertedId;
             await Indexing.indexDecision('sder', normDec, null, 'import in decisions (sync)');
           } else if (normalized.locked === false && decisions[i].diff !== null) {
-            let normDec = await Indexing.normalizeDecision('cc', decision, normalized, false, true);
+            let normDec = (await Indexing.normalizeDecision('cc', decision, normalized, false, true)).result;
             normDec.dateCreation = new Date().toISOString();
             normDec.zoning = null;
             if (decisions[i].reprocess) {
@@ -531,7 +531,7 @@ class Collector {
 
           let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
           if (normalized === null) {
-            let normDec = await Indexing.normalizeDecision('cc', decision, null, false, true);
+            let normDec = (await Indexing.normalizeDecision('cc', decision, null, false, true)).result;
             const insertResult = await Database.insertOne('sder.decisions', normDec);
             normDec._id = insertResult.insertedId;
             await Indexing.indexDecision('sder', normDec, null, 'import in decisions');

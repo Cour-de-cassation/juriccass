@@ -14,7 +14,7 @@ async function main() {
 
   try {
     lastDate = DateTime.fromISO(
-      fs.readFileSync(path.join(__dirname, '..', '..', 'settings', 'cc.lastUpdate')).toString(),
+      fs.readFileSync(path.join(__dirname, '..', '..', 'settings', 'update.lastUpdate')).toString(),
     );
   } catch (ignore) {
     lastDate = now.minus({ days: 2 });
@@ -51,7 +51,7 @@ async function main() {
   }
 
   try {
-    fs.writeFileSync(path.join(__dirname, '..', '..', 'settings', 'cc.lastUpdate'), lastDate.toISO());
+    fs.writeFileSync(path.join(__dirname, '..', '..', 'settings', 'update.lastUpdate'), lastDate.toISO());
   } catch (e) {
     logger.error(e);
   }

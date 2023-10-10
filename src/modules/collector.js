@@ -260,7 +260,7 @@ class Collector {
 
     try {
       whitelist = JSON.parse(
-        fs.readFileSync(path.join(__dirname, '..', '..', 'settings', 'id_whitelist.json')).toString(),
+        fs.readFileSync(path.join(__dirname, '..', '..', 'settings', 'id_collect_whitelist.json')).toString(),
       );
     } catch (ignore) {}
 

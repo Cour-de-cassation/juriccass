@@ -69,10 +69,10 @@ server.listen(6666, () => {
 async function test() {
   try {
     const decision = {
-      _id: ObjectId(),
+      _id: new ObjectId(),
       foo: 'bar',
     };
-    const result = await axios.post(`${process.env.INDEX_URI}/normalizeDecision`, { source: 'cc', decision: decision });
+    const result = await axios.post(`http://localhost:6666/normalizeDecision`, { source: 'cc', decision: decision });
     console.log(result);
   } catch (e) {
     console.error(e);

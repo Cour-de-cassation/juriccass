@@ -1,4 +1,5 @@
 const { Database, ObjectId } = require('./modules/database');
+const axios = require('axios');
 const http = require('http');
 const express = require('express');
 const app = express();
@@ -60,6 +61,21 @@ router.post(`/normalizeDecision`, async (req, res) => {
 });
 app.use(router);
 const server = http.createServer(app);
-server.listen(123456, () => {
-  log.info(`Start HTTP server on port 123456.`);
+server.listen(6666, () => {
+  console.info(`Start HTTP server on port 6666.`);
+  setTimeout(test, 1000);
 });
+
+async function test() {
+  try {
+    const decision = {
+      _id: ObjectId(),
+      foo: 'bar',
+    };
+    const result = await axios.post(`${process.env.INDEX_URI}/normalizeDecision`, { source: 'cc', decision: decision });
+    console.log(result);
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+}

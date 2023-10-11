@@ -9,7 +9,7 @@ app.set('trust proxy', 1);
 const router = express.Router();
 router.post(`/normalizeDecision`, async (req, res) => {
   console.log(req.body.decision);
-  const jobId = `${ObjectId()}`;
+  const jobId = `${new ObjectId()}`;
   const jobType = 'normalizeDecision';
   let result = false;
   let error = null;

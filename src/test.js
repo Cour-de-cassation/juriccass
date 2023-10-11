@@ -72,7 +72,7 @@ async function test() {
       _id: new ObjectId(),
       foo: 'bar',
     };
-    const result = await axios.post(`http://localhost:6666/normalizeDecision`, { source: 'cc', decision: decision });
+    const result = await axios.post(`http://127.0.0.1:6666/normalizeDecision`, { source: 'cc', decision: decision });
     console.log(result);
   } catch (e) {
     console.error(e);

@@ -12,7 +12,7 @@ const Logger = pino({
       translateTime: 'UTC:dd-mm-yyyy - HH:MM:ss Z',
     },
   },
-  base: { appName: 'JuriCC' },
+  base: { appName: `${process.env.APP_NAME}` },
   formatters: {
     level: (label) => {
       return {

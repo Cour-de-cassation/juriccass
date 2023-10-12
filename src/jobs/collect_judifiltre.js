@@ -6,9 +6,7 @@ const logger = Logger.child({
 
 async function main() {
   logger.info('Start');
-
-  // @TODO when needed
-
+  logger.info('(nothing to do (yet))');
   logger.info('End');
   process.exit(0);
 }

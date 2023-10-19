@@ -88,8 +88,6 @@ async function main() {
           try {
             text = he.decode(text);
           } catch (ignore) {}
-          text = text.toLowerCase();
-          text = text.replace(/\*+\s*$/gm, '');
           text = text.replace(/\s+/gm, ' ');
           text = text.replace(/(\w)\s+\./gm, '$1.');
           text = text.replace(/\(\s+(\w)/gm, '($1');
@@ -106,7 +104,6 @@ async function main() {
           try {
             text = he.decode(text);
           } catch (ignore) {}
-          text = text.replace(/\*+\s*$/gm, '');
           text = text.replace(/\s+/gm, ' ');
           text = text.replace(/(\w)\s+\./gm, '$1.');
           text = text.replace(/\(\s+(\w)/gm, '($1');

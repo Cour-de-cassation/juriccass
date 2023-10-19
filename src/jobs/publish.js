@@ -8,8 +8,6 @@ const logger = Logger.child({
 async function main() {
   const id = 1791514;
 
-  logger.info('--- ANALYSE ---');
-
   const results = await Database.find(
     'si.jurinet',
     `SELECT *
@@ -19,6 +17,7 @@ async function main() {
     [id],
   );
   for (let i = 0; i < results.length; i++) {
+    console.log('---');
     for (let k in results[i]) {
       if ((/^pm/i.test(k) || /^am/i.test(k)) && results[i][k]) {
         console.log(k, results[i][k]);
@@ -35,6 +34,7 @@ async function main() {
       [id, results[i].NUM_ANALYSE],
     );
     for (let i2 = 0; i2 < results2.length; i2++) {
+      console.log('--->');
       for (let k2 in results2[i2]) {
         if ((/^pm/i.test(k2) || /^am/i.test(k2)) && results2[i2][k2]) {
           console.log('--->', k2, results2[i2][k2]);

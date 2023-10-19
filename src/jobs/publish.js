@@ -19,23 +19,28 @@ async function main() {
     [id],
   );
   for (let i = 0; i < results.length; i++) {
-    logger.info(i);
-    logger.info(JSON.stringify(results[i], null, 2));
-  }
+    for (let k in results[i]) {
+      if ((/^pm/i.test(k) || /^am/i.test(k)) && results[i][k]) {
+        console.log(k, results[i][k]);
+      }
+    }
 
-  logger.info('--- TITREREFERENCE ---');
-
-  const results2 = await Database.find(
-    'si.jurinet',
-    `SELECT *
-    FROM TITREREFERENCE
-    WHERE ID_DOCUMENT = :id
-    ORDER BY NUM_ANALYSE ASC`,
-    [id],
-  );
-  for (let i = 0; i < results2.length; i++) {
-    logger.info(i);
-    logger.info(JSON.stringify(results2[i], null, 2));
+    const results2 = await Database.find(
+      'si.jurinet',
+      `SELECT *
+        FROM TITREREFERENCE
+        WHERE ID_DOCUMENT = :id
+        AND NUM_ANALYSE = :analyse
+        ORDER BY NUM_TITREREFERENCE ASC`,
+      [id, results[i].NUM_ANALYSE],
+    );
+    for (let i2 = 0; i2 < results2.length; i2++) {
+      for (let k2 in results2[i2]) {
+        if ((/^pm/i.test(k2) || /^am/i.test(k2)) && results2[i2][k2]) {
+          console.log('--->', k2, results2[i2][k2]);
+        }
+      }
+    }
   }
 }
 

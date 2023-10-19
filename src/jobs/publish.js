@@ -123,7 +123,7 @@ async function main() {
     }
   }
 
-  console.log(titlesAndSummaries);
+  console.log(JSON.stringify(titlesAndSummaries));
 }
 
 main();

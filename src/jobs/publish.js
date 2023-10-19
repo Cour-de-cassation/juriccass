@@ -17,9 +17,10 @@ async function main() {
     [id],
   );
   for (let i = 0; i < results.length; i++) {
+    console.log('');
     console.log('---');
     for (let k in results[i]) {
-      if ((/^pm/i.test(k) || /^am/i.test(k)) && results[i][k]) {
+      if ((/^pm/i.test(k) || /^am/i.test(k) || /^som/i.test(k)) && results[i][k]) {
         console.log(k, results[i][k]);
       }
     }
@@ -36,7 +37,7 @@ async function main() {
     for (let i2 = 0; i2 < results2.length; i2++) {
       console.log('--->');
       for (let k2 in results2[i2]) {
-        if ((/^pm/i.test(k2) || /^am/i.test(k2)) && results2[i2][k2]) {
+        if ((/^pm/i.test(k2) || /^am/i.test(k2) || /^som/i.test(k2)) && results2[i2][k2]) {
           console.log('--->', k2, results2[i2][k2]);
         }
       }

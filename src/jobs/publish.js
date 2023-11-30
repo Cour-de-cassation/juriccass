@@ -9,7 +9,7 @@ const logger = Logger.child({
 const he = require('he');
 
 async function main() {
-  const id = 1791514;
+  const id = 1828528; // 1888231 // 1791514
 
   const titlesAndSummaries = [];
 
@@ -25,6 +25,7 @@ async function main() {
     const item = {
       titles: [],
       summary: null,
+      secondaryTitles: [],
     };
     for (let k in results[i]) {
       if ((/^pm/i.test(k) || /^am/i.test(k)) && results[i][k]) {
@@ -62,9 +63,6 @@ async function main() {
         }
       }
     }
-    if (item.titles.length > 0 || item.summary !== null) {
-      titlesAndSummaries.push(item);
-    }
 
     const results2 = await Database.find(
       'si.jurinet',
@@ -77,10 +75,8 @@ async function main() {
     );
 
     for (let i2 = 0; i2 < results2.length; i2++) {
-      const item = {
-        titles: [],
-        summary: null,
-      };
+      const secondaryTitle = [];
+
       for (let k2 in results2[i2]) {
         if ((/^pm/i.test(k2) || /^am/i.test(k2)) && results2[i2][k2]) {
           let text = results2[i2][k2];
@@ -96,9 +92,11 @@ async function main() {
           text = text.replace(/([^,]),(\w)/gm, '$1, $2');
           text = text.trim();
           if (text) {
-            item.titles.push(text);
+            secondaryTitle.push(text);
           }
         }
+
+        /*
         if (/^som/i.test(k2) && results2[i2][k2]) {
           let text = results2[i2][k2];
           try {
@@ -116,10 +114,16 @@ async function main() {
             item.summary = text;
           }
         }
+        */
       }
-      if (item.titles.length > 0 || item.summary !== null) {
-        titlesAndSummaries.push(item);
+
+      if (secondaryTitle.length > 0) {
+        item.secondaryTitles.push(secondaryTitle);
       }
+    }
+
+    if (item.titles.length > 0 || item.summary !== null) {
+      titlesAndSummaries.push(item);
     }
   }
 

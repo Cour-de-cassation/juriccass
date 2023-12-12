@@ -651,7 +651,8 @@ class Collector {
         reinjected.DT_MODIF = new Date();
         reinjected.DT_MODIF_ANO = new Date();
         await Database.replaceOne('sder.rawJurinet', { _id: reinjected._id }, reinjected);
-        decision.labelStatus = 'exported';
+        decision.labelStatus = 'done';
+        decision.publishStatus = 'toBePublished';
         decision.dateCreation = new Date().toISOString();
         await Database.replaceOne('sder.decisions', { _id: decision._id }, decision);
         await Indexing.updateDecision('sder', decision, null, `reinject`);

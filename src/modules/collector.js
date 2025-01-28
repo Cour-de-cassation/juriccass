@@ -1,9 +1,6 @@
 const { Database } = require('./database');
 const { DateTime } = require('luxon');
 const { Chaining } = require('./chaining');
-const { Indexing } = require('./indexing');
-const fs = require('fs');
-const path = require('path');
 const { Logger } = require('./logger');
 const logger = Logger.child({
   moduleName: require('path').basename(__filename, '.js'),
@@ -256,14 +253,6 @@ class Collector {
   }
 
   async filterCollectedDecisions(decisions, updated) {
-    let whitelist = [];
-
-    try {
-      whitelist = JSON.parse(
-        fs.readFileSync(path.join(__dirname, '..', '..', 'settings', 'id_collect_whitelist.json')).toString(),
-      );
-    } catch (ignore) {}
-
     const filtered = {
       collected: [],
       rejected: [],
@@ -273,7 +262,6 @@ class Collector {
       const decision = decisions[i];
 
       if (
-        whitelist.indexOf(decision.ID_DOCUMENT) !== -1 ||
         decision.TYPE_ARRET === 'CC' ||
         (decision.TYPE_ARRET === 'AUTRE' &&
           (/^t\.cfl$/i.test(decision.ID_CHAMBRE) === true || /judiciaire.*paris$/i.test(decision.JURIDICTION)))
@@ -399,19 +387,19 @@ class Collector {
             let inDate = new Date(Date.parse(decision.DT_DECISION.toISOString()));
             inDate.setHours(inDate.getHours() + 2);
             inDate = DateTime.fromJSDate(inDate);
-            if (whitelist.indexOf(decision.ID_DOCUMENT) === -1 && inDate.diffNow('months').toObject().months <= -6) {
+            if (inDate.diffNow('months').toObject().months <= -6) {
               filtered.rejected.push({
                 decision: decision,
                 reason: 'decision is too old',
               });
-            } else if (whitelist.indexOf(decision.ID_DOCUMENT) === -1 && inDate.diffNow('days').toObject().days > 1) {
+            } else if (inDate.diffNow('days').toObject().days > 1) {
               filtered.rejected.push({
                 decision: decision,
                 reason: 'decision is too early',
               });
             } else {
               const found = await Database.findOne('sder.rawJurinet', { _id: decision.ID_DOCUMENT });
-              if (whitelist.indexOf(decision.ID_DOCUMENT) !== -1 || found === null) {
+              if (found === null) {
                 filtered.collected.push({
                   decision: decision,
                 });
@@ -447,56 +435,27 @@ class Collector {
         if (updated === true) {
           if (decisions[i].diff === null) {
             await Database.insertOne('sder.rawJurinet', decision);
-            await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet (sync)');
           } else {
             if (decisions[i].reprocess === true) {
               decision.IND_ANO = 0;
               decision.XMLA = null;
-              if (decisions[i].anomaly === true) {
-                await Indexing.updateDecision(
-                  'cc',
-                  decision,
-                  null,
-                  `update in rawJurinet and reprocessed (sync) - original text could have been changed - changelog: ${JSON.stringify(
-                    decisions[i].diff,
-                  )}`,
-                );
-              } else {
-                await Indexing.updateDecision(
-                  'cc',
-                  decision,
-                  null,
-                  `update in rawJurinet and reprocessed (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
-                );
-              }
             } else if (decisions[i].anomaly === true) {
-              await Indexing.updateDecision(
-                'cc',
-                decision,
-                null,
-                `update in rawJurinet (sync) - original text could have been changed - changelog: ${JSON.stringify(
-                  decisions[i].diff,
-                )}`,
-              );
             } else {
-              await Indexing.updateDecision(
-                'cc',
-                decision,
-                null,
-                `update in rawJurinet (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
-              );
             }
             await Database.replaceOne('sder.rawJurinet', { _id: decision._id }, decision);
           }
-          await Indexing.indexAffaire('cc', decision);
+
+          // @TODO await Indexing.indexAffaire('cc', decision);
 
           let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
           if (normalized === null) {
+            /* @TODO
             let normDec = (await Indexing.normalizeDecision('cc', decision, null, false, true)).result;
             const insertResult = await Database.insertOne('sder.decisions', normDec);
             normDec._id = insertResult.insertedId;
-            await Indexing.indexDecision('sder', normDec, null, 'import in decisions (sync)');
+            */
           } else if (normalized.locked === false && decisions[i].diff !== null) {
+            /* @TODO
             let normDec = (await Indexing.normalizeDecision('cc', decision, normalized, false, true)).result;
             normDec.dateCreation = new Date().toISOString();
             normDec.zoning = null;
@@ -508,33 +467,18 @@ class Collector {
             }
             await Database.replaceOne('sder.decisions', { _id: normalized._id }, normDec);
             normDec._id = normalized._id;
-            if (decisions[i].reprocess === true) {
-              await Indexing.updateDecision(
-                'sder',
-                normDec,
-                null,
-                `update in decisions and reprocessed (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
-              );
-            } else {
-              await Indexing.updateDecision(
-                'sder',
-                normDec,
-                null,
-                `update in decisions (sync) - changelog: ${JSON.stringify(decisions[i].diff)}`,
-              );
-            }
+            */
           }
         } else {
           await Database.insertOne('sder.rawJurinet', decision);
-          await Indexing.indexDecision('cc', decision, null, 'import in rawJurinet');
-          await Indexing.indexAffaire('cc', decision);
+          // @TODO await Indexing.indexAffaire('cc', decision);
 
           let normalized = await Database.findOne('sder.decisions', { sourceId: decision._id, sourceName: 'jurinet' });
           if (normalized === null) {
+            /*
             let normDec = (await Indexing.normalizeDecision('cc', decision, null, false, true)).result;
             const insertResult = await Database.insertOne('sder.decisions', normDec);
             normDec._id = insertResult.insertedId;
-            await Indexing.indexDecision('sder', normDec, null, 'import in decisions');
             await Database.writeQuery(
               'si.jurinet',
               `UPDATE DOCUMENT
@@ -542,15 +486,14 @@ class Collector {
                 WHERE ID_DOCUMENT = :id`,
               [1, decision._id],
             );
+            */
           } else {
             logger.warn(
               `Jurinet import anomaly: decision ${decision._id} seems new but a related SDER record ${normalized._id} already exists.`,
             );
-            await Indexing.updateDecision('sder', normalized, null, `SDER record ${normalized._id} already exists`);
           }
         }
       } catch (e) {
-        await Indexing.updateDecision('cc', decision, null, null, e);
         await Database.writeQuery(
           'si.jurinet',
           `UPDATE DOCUMENT

@@ -17,20 +17,7 @@ class Database {
         connection: null,
         client: null,
         collections: {
-          decisions: null,
-          rawDILA: null,
-          rawJurica: null,
           rawJurinet: null,
-        },
-      },
-      index: {
-        isMongo: true,
-        connected: false,
-        connection: null,
-        client: null,
-        collections: {
-          affaires: null,
-          mainIndex: null,
         },
       },
       si: {
@@ -50,9 +37,6 @@ class Database {
     if (/^sder\./i.test(collection) === true) {
       return this.handlers.sder;
     }
-    if (/^index\./i.test(collection) === true) {
-      return this.handlers.index;
-    }
     if (/^si\./i.test(collection) === true) {
       return this.handlers.si;
     }
@@ -62,9 +46,6 @@ class Database {
   getDbURI(collection) {
     if (/^sder\./i.test(collection) === true) {
       return process.env.SDER_DB_URI;
-    }
-    if (/^index\./i.test(collection) === true) {
-      return process.env.INDEX_DB_URI;
     }
     if (/^si\.jurinet/i.test(collection) === true) {
       return process.env.SI_JURINET_DB_URI;
@@ -84,9 +65,6 @@ class Database {
   getDbName(collection) {
     if (/^sder\./i.test(collection) === true) {
       return process.env.SDER_DB_NAME;
-    }
-    if (/^index\./i.test(collection) === true) {
-      return process.env.INDEX_DB_NAME;
     }
     if (/^si\.jurinet/i.test(collection) === true) {
       return process.env.SI_JURINET_DB_NAME;
@@ -154,10 +132,6 @@ class Database {
         case 'ID_DOCUMENT':
           data._id = row[key];
           data.ID_DOCUMENT = row[key];
-          break;
-        case 'JDEC_ID':
-          data._id = row[key];
-          data.JDEC_ID = row[key];
           break;
         case 'rnum':
           // Ignore rnum key (added by offset/limit queries)
@@ -276,25 +250,11 @@ class Database {
   }
 
   async oracleWriteQuery(collection, args) {
-    if (parseInt(`${process.env.DB_READONLY}`, 10) === 1) {
-      logger.error(args, `oracleWriteQuery denied on collection ${collection}`);
-      return false;
-    }
-    logger.warn(args, `oracleWriteQuery performed on collection ${collection}`);
-    const handler = this.getHandler(collection);
-    let result = null;
-    const [query, params] = this.buildOracleWriteQuery(collection, args);
-    result = await handler.connection.execute(query, params, {
-      autoCommit: true,
-    });
-    return result;
+    logger.error(args, `oracleWriteQuery denied on collection ${collection}`);
+    return false;
   }
 
   async writeQuery(collection, ...args) {
-    if (parseInt(`${process.env.DB_READONLY}`, 10) === 1) {
-      logger.error(args, `writeQuery denied on collection ${collection}`);
-      return false;
-    }
     await this.connect(collection);
     const handler = this.getHandler(collection);
     const shortCollectionName = collection.replace(/^\w+\./i, '');
@@ -379,10 +339,6 @@ class Database {
   }
 
   async insertOne(collection, ...args) {
-    if (parseInt(`${process.env.DB_READONLY}`, 10) === 1) {
-      logger.error(args, `insertOne denied on collection ${collection}`);
-      return false;
-    }
     await this.connect(collection);
     const handler = this.getHandler(collection);
     const shortCollectionName = collection.replace(/^\w+\./i, '');
@@ -405,10 +361,6 @@ class Database {
   }
 
   async replaceOne(collection, ...args) {
-    if (parseInt(`${process.env.DB_READONLY}`, 10) === 1) {
-      logger.error(args, `replaceOne denied on collection ${collection}`);
-      return false;
-    }
     await this.connect(collection);
     const handler = this.getHandler(collection);
     const shortCollectionName = collection.replace(/^\w+\./i, '');
@@ -431,10 +383,6 @@ class Database {
   }
 
   async deleteOne(collection, ...args) {
-    if (parseInt(`${process.env.DB_READONLY}`, 10) === 1) {
-      logger.error(args, `deleteOne denied on collection ${collection}`);
-      return false;
-    }
     await this.connect(collection);
     const handler = this.getHandler(collection);
     const shortCollectionName = collection.replace(/^\w+\./i, '');
@@ -454,10 +402,6 @@ class Database {
   }
 
   async deleteMany(collection, ...args) {
-    if (parseInt(`${process.env.DB_READONLY}`, 10) === 1) {
-      logger.error(args, `deleteMany denied on collection ${collection}`);
-      return false;
-    }
     await this.connect(collection);
     const handler = this.getHandler(collection);
     const shortCollectionName = collection.replace(/^\w+\./i, '');
@@ -477,10 +421,6 @@ class Database {
   }
 
   async dropIndexes(collection, ...args) {
-    if (parseInt(`${process.env.DB_READONLY}`, 10) === 1) {
-      logger.error(args, `dropIndexes denied on collection ${collection}`);
-      return false;
-    }
     await this.connect(collection);
     const handler = this.getHandler(collection);
     const shortCollectionName = collection.replace(/^\w+\./i, '');
@@ -500,10 +440,6 @@ class Database {
   }
 
   async createIndex(collection, ...args) {
-    if (parseInt(`${process.env.DB_READONLY}`, 10) === 1) {
-      logger.error(args, `createIndex denied on collection ${collection}`);
-      return false;
-    }
     await this.connect(collection);
     const handler = this.getHandler(collection);
     const shortCollectionName = collection.replace(/^\w+\./i, '');

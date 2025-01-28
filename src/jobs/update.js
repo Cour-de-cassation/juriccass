@@ -22,25 +22,11 @@ async function main() {
 
   let decisions;
 
-  if (process.env.USE_SI_API === 'ON') {
-    logger.info('Update using SI API');
-    decisions = await Collector.getUpdatedDecisionsUsingAPI(lastDate);
-  } else {
-    logger.info('Update using direct DB access');
-    decisions = await Collector.getUpdatedDecisionsUsingDB(lastDate);
-  }
+  decisions = await Collector.getUpdatedDecisions(lastDate);
 
   if (decisions && decisions.collected && Array.isArray(decisions.collected) && decisions.collected.length > 0) {
     logger.info(`${decisions.collected.length} decision(s) updated`);
-
-    if (process.env.USE_DBSDER_API === 'ON') {
-      logger.info('Store and normalize using DBSDER API');
-      await Collector.storeAndNormalizeNewDecisionsUsingDB(decisions.collected, true);
-    } else {
-      logger.info('Store and normalize using direct DB access');
-      await Collector.storeAndNormalizeNewDecisionsUsingDB(decisions.collected, true);
-    }
-
+    await Collector.storeAndNormalizeNewDecisions(decisions.collected, true);
     for (let i = 0; i < decisions.collected.length; i++) {
       let decision = decisions.collected[i].decision;
       let modifTime = DateTime.fromJSDate(decision.DT_MODIF);

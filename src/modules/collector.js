@@ -12,7 +12,7 @@ const logger = Logger.child({
 class Collector {
   constructor() {}
 
-  async collectNewDecisionsUsingDB() {
+  async collectNewDecisions() {
     let oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     oneMonthAgo.setHours(0, 0, 0, 0);
@@ -33,13 +33,13 @@ class Collector {
     );
 
     for (let i = 0; i < decisions.length; i++) {
-      decisions[i] = await this.completeDecisionUsingDB(decisions[i]);
+      decisions[i] = await this.completeDecision(decisions[i]);
     }
 
-    return await this.filterCollectedDecisionsUsingDB(decisions);
+    return await this.filterCollectedDecision(decisions);
   }
 
-  async getUpdatedDecisionsUsingDB(lastDate) {
+  async getUpdatedDecisions(lastDate) {
     const date = lastDate.toJSDate();
     let strDate = date.getDate() < 10 ? '0' + date.getDate() : date.getDate();
     strDate += '/' + (date.getMonth() + 1 < 10 ? '0' + (date.getMonth() + 1) : date.getMonth() + 1);
@@ -55,13 +55,13 @@ class Collector {
     );
 
     for (let i = 0; i < decisions.length; i++) {
-      decisions[i] = await this.completeDecisionUsingDB(decisions[i]);
+      decisions[i] = await this.completeDecision(decisions[i]);
     }
 
-    return await this.filterCollectedDecisionsUsingDB(decisions, true);
+    return await this.filterCollectedDecisions(decisions, true);
   }
 
-  async completeDecisionUsingDB(decision) {
+  async completeDecision(decision) {
     decision._portalis = null;
 
     // Inject "titrage" data (if any) into the document:
@@ -119,7 +119,7 @@ class Collector {
     }
 
     // Inject "decatt" data (if any) into the document:
-    decision._decatt = await Chaining.getDecAttUsingDB(decision.ID_DOCUMENT);
+    decision._decatt = await Chaining.getDecAtt(decision.ID_DOCUMENT);
 
     // Inject "bloc_occultation" data (if any) into the document:
     try {
@@ -255,7 +255,7 @@ class Collector {
     return decision;
   }
 
-  async filterCollectedDecisionsUsingDB(decisions, updated) {
+  async filterCollectedDecisions(decisions, updated) {
     let whitelist = [];
 
     try {
@@ -439,7 +439,7 @@ class Collector {
     return filtered;
   }
 
-  async storeAndNormalizeNewDecisionsUsingDB(decisions, updated) {
+  async storeAndNormalizeNewDecisions(decisions, updated) {
     for (let i = 0; i < decisions.length; i++) {
       let decision = decisions[i].decision;
       try {
@@ -560,144 +560,16 @@ class Collector {
         );
         if (updated) {
           logger.error(
-            `storeAndNormalizeDecisionsUsingDB error for decision ${decision._id} (sync) - changelog: ${JSON.stringify(
+            `storeAndNormalizeDecisions error for decision ${decision._id} (sync) - changelog: ${JSON.stringify(
               decisions[i].diff,
             )}`,
             e,
           );
         } else {
-          logger.error(`storeAndNormalizeDecisionsUsingDB error for decision ${decision._id} (collect)`, e);
+          logger.error(`storeAndNormalizeDecisions error for decision ${decision._id} (collect)`, e);
         }
       }
     }
-    return true;
-  }
-
-  async getDecisionsToReinjectUsingDB() {
-    const decisions = {
-      collected: [],
-      rejected: [],
-    };
-
-    decisions.collected = await Database.find(
-      'sder.decisions',
-      { labelStatus: 'done', sourceName: 'jurinet' },
-      { allowDiskUse: true },
-    );
-
-    return decisions;
-  }
-
-  async reinjectUsingDB(decisions) {
-    for (let i = 0; i < decisions.length; i++) {
-      const decision = decisions[i];
-      try {
-        // 1. Get the original decision from Jurinet:
-        const sourceDecision = await Database.findOne(
-          'si.jurinet',
-          `SELECT *
-          FROM DOCUMENT
-          WHERE DOCUMENT.ID_DOCUMENT = :id`,
-          [decision.sourceId],
-        );
-        if (sourceDecision && sourceDecision.XML) {
-          // 2. Get the content of the original XML field to create the new XMLA field:
-          let xmla = sourceDecision.XML;
-          if (xmla.indexOf('<TEXTE_ARRET>') !== -1) {
-            // 3. Reinject the <TEXTE_ARRET> tag but with the reencoded pseudonymized content,
-            let pseudoText = decision.pseudoText.replace(/&/g, '&amp;').replace(/&amp;amp;/g, '&amp;');
-            pseudoText = pseudoText.replace(/</g, '&lt;');
-            pseudoText = pseudoText.replace(/>/g, '&gt;');
-            pseudoText = pseudoText.replace(/"/g, '&quot;');
-            pseudoText = pseudoText.replace(/'/g, '&apos;');
-            xmla = xmla.replace(
-              /<TEXTE_ARRET>[\s\S]*<\/TEXTE_ARRET>/gim,
-              '<TEXTE_ARRET>' + pseudoText + '</TEXTE_ARRET>',
-            );
-            xmla = Database.encodeOracleText(xmla);
-            // 4. Set the date:
-            const now = new Date();
-            // 5. Update query (which, contrary to the doc, requires xmla to be passed as a String):
-            await Database.writeQuery(
-              'si.jurinet',
-              `UPDATE DOCUMENT
-              SET XMLA=:xmla,
-              IND_ANO=:ok,
-              AUT_ANO=:label,
-              DT_ANO=:datea,
-              DT_MODIF=:dateb,
-              DT_MODIF_ANO=:datec,
-              DT_ENVOI_DILA=NULL
-              WHERE ID_DOCUMENT=:id`,
-              [xmla.toString('binary'), 2, 'LABEL', now, now, now, decision.sourceId],
-            );
-          } else {
-            throw new Error(
-              'reinjectUsingDB: <TEXTE_ARRET> tag not found: the document could be malformed or corrupted.',
-            );
-          }
-        } else {
-          throw new Error(`reinjectUsingDB: decision '${decision.sourceId}' not found or has no XML content.`);
-        }
-        const reinjected = await Database.findOne(
-          'si.jurinet',
-          `SELECT *
-          FROM DOCUMENT
-          WHERE DOCUMENT.ID_DOCUMENT = :id`,
-          [decision.sourceId],
-        );
-        reinjected._indexed = null;
-        reinjected.DT_ANO = new Date();
-        reinjected.DT_MODIF = new Date();
-        reinjected.DT_MODIF_ANO = new Date();
-        await Database.replaceOne('sder.rawJurinet', { _id: reinjected._id }, reinjected);
-        decision.labelStatus = 'done';
-        decision.publishStatus = 'toBePublished';
-        decision.dateCreation = new Date().toISOString();
-        await Database.replaceOne('sder.decisions', { _id: decision._id }, decision);
-        await Indexing.updateDecision('sder', decision, null, `reinject`);
-      } catch (e) {
-        logger.error(`Jurinet reinjection error processing decision ${decision._id}`, e);
-        await Indexing.updateDecision('sder', decision, null, null, e);
-      }
-    }
-    return true;
-  }
-
-  // @TODO
-  async collectNewDecisionsUsingAPI() {
-    const decisions = {
-      collected: [],
-      rejected: [],
-    };
-    return decisions;
-  }
-
-  // @TODO
-  async getUpdatedDecisionsUsingAPI(lastDate) {
-    const decisions = {
-      collected: [],
-      rejected: [],
-    };
-    return decisions;
-  }
-
-  // @TODO
-  async storeAndNormalizeNewDecisionsUsingAPI(decisions, updated) {
-    return true;
-  }
-
-  // @TODO
-  async getDecisionsToReinjectUsingAPI() {
-    const decisions = {
-      collected: [],
-      rejected: [],
-    };
-    return decisions;
-  }
-
-  // @TODO
-  async reinjectUsingAPI(decisions) {
     return true;
   }
 }

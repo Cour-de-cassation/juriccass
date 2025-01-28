@@ -1,2 +1,2 @@
 # juricc
-Collect and store CC decisions.
+Collect CC decisions.
